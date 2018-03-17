@@ -78,11 +78,10 @@ void delete_array(string_array *array_struct) {
 }
 
 void delete_block(string_array* array_struct, int index) {
+    if (!inside_array(array_struct, index)) return;
     if (array_struct->type == DYNAMIC) {
-        if (inside_array(array_struct, index)) {
             free(array_struct -> array[index]);
             array_struct -> array[index] = NULL;
-        }
     } else {
         clean_block(array_struct, index);
     }
@@ -90,7 +89,7 @@ void delete_block(string_array* array_struct, int index) {
 
 void add_block(string_array *array_struct, int index, char* string) {
     int string_len = (int) strlen(string);
-    if(string_len > array_struct -> block_size) return;
+    if(string_len > array_struct -> block_size || !inside_array(array_struct, index)) return;
     switch (array_struct->type) {
         case STATIC:
             array_struct -> array[index] = string;
