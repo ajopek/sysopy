@@ -1,0 +1,4 @@
+/home/artur/sysopy/zestaw1/zad1/build/CMakeFiles/edit_cache.dir
+/home/artur/sysopy/zestaw1/zad1/build/CMakeFiles/rebuild_cache.dir
+/home/artur/sysopy/zestaw1/zad1/build/CMakeFiles/string_array_static.dir
+/home/artur/sysopy/zestaw1/zad1/build/CMakeFiles/string_array.dir

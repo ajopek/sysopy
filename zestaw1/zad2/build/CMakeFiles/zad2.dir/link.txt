@@ -1,0 +1,1 @@
+/usr/bin/cc  -O3 -DNDEBUG   CMakeFiles/zad2.dir/main.c.o  -o zad2 ../libstring_array_static.a 

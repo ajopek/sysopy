@@ -1,0 +1,134 @@
+} 
+} 
+Array size: 100, Block size: 100, Array allocation type: Static 
+{ 
+ 
+Time of creating array, 1000 times 
+Real time: -1521330301 
+User time: -861479 
+System time: 0 
+
+
+Time of add and delete, 1000 times 
+Real time: -1521330301 
+User time: -861480 
+System time: -3524075731 
+
+
+Time of find nearest element, 1000 times 
+Real time: -1521330301 
+User time: -861479 
+System time: -3764 
+
+
+} 
+Array size: 100, Block size: 100, Array allocation type: Static 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: -1521330448 
+User time: -709257 
+System time: 0 
+
+
+Time of add and delete, 1000 times 
+Real time: -1521330448 
+User time: -709258 
+System time: -3524075731 
+
+
+Time of find nearest element, 10000 times 
+Real time: -1521330448 
+User time: -709258 
+System time: -3764 
+
+
+} 
+Array size: 100, Block size: 100, Array allocation type: Static 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: -1521330459 
+User time: -974684 
+System time: 0 
+
+
+Time of add and delete, 10000 times 
+Real time: -1521330459 
+User time: -974684 
+System time: -3524075731 
+
+
+Time of find nearest element, 10000 times 
+Real time: -1521330460 
+User time: 25203 
+System time: -3764 
+
+
+} 
+Array size: 100, Block size: 100, Array allocation type: Static 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: -1521330467 
+User time: -407116 
+System time: 0 
+
+
+Time of add and delete, 100000 times 
+Real time: -1521330467 
+User time: -408194 
+System time: -3524075731 
+
+
+Time of find nearest element, 10000 times 
+Real time: -1521330467 
+User time: -408352 
+System time: -3764 
+
+
+} 
+Array size: 100, Block size: 100, Array allocation type: Static 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: -1521330752 
+User time: -407155 
+System time: 0 
+
+
+Time of add and delete, 100000 times 
+Real time: -1521330752 
+User time: -407305 
+System time: -3524075731 
+
+
+Time of find nearest element, 10000 times 
+Real time: -1521330752 
+User time: -407307 
+System time: -3764 
+
+
+} 
+Array size: 100, Block size: 100, Array allocation type: Static 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: -1521330816 
+User time: -658498 
+System time: 0 
+
+
+Time of add and delete, 100000 times 
+Real time: -1521330816 
+User time: -658500 
+System time: -3524075731 
+
+
+Time of find nearest element, 10000 times 
+Real time: -1521330816 
+User time: -658500 
+System time: -3764 
+
+
+} 

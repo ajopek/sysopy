@@ -1,0 +1,1 @@
+/usr/bin/cc  -fPIC -O3 -DNDEBUG  -shared -Wl,-soname,libstring_array.so -o libstring_array.so CMakeFiles/string_array.dir/string_array_lib.c.o 
