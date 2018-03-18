@@ -310,9 +310,9 @@ void fill_random_content(string_array* array) {
 void print_help(){
     printf("Usage of program: \n"
                    "Program will take 4 arguments, which specify operations to test. \n"
-                   "Avaliable operations: \n"
+                   "Available operations: \n"
                    "static | dynamic - set the type of used array, needst to be first argument\n"
-                   "create_table size block_size - needs to be the second argument \n"
+                   "create_array size block_size - needs to be the second argument \n"
                    "add_then_delete number - add number of random blocks then delete them \n"
                    "search value - search for block with nearest ascii sum to value \n"
                    "add_and_delete number - add and delete number of random blocks");
