@@ -1,2 +1,0 @@
-/usr/bin/ar qc libstring_array_static.a  CMakeFiles/string_array_static.dir/string_array_lib.c.o
-/usr/bin/ranlib libstring_array_static.a

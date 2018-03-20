@@ -1,0 +1,146 @@
+Static:
+Array size: 100, Block size: 10, Array allocation type: Static
+{
+
+Time of creating array, 10000 times
+Real time: 23671
+User time: 21874
+System time: 1793
+
+
+Time of add then delete, 1000 times
+Real time: 112
+User time: 104
+System time: 8
+
+Time of find nearest element, 10000 times
+Real time: 55943
+User time: 55904
+System time: 38
+
+
+Time of add and delete, 1000 times
+Real time: 157
+User time: 151
+System time: 5
+
+}
+
+Array size: 100, Block size: 10, Array allocation type: Dynamic 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: 2345 
+User time: 0 
+System time: 2343 
+
+
+Time of add then delete, 1000 times 
+Real time: 138 
+User time: 0 
+System time: 137 
+
+
+Time of find nearest element, 10000 times 
+Real time: 36025 
+User time: 34706 
+System time: 986 
+
+
+Time of add and delete, 1000 times 
+Real time: 113 
+User time: 101 
+System time: 13 
+
+} 
+
+Shared:
+Array size: 100, Block size: 10, Array allocation type: Dynamic 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: 2408 
+User time: 0 
+System time: 2407 
+
+
+Time of add then delete, 1000 times 
+Real time: 143 
+User time: 0 
+System time: 143 
+
+
+Time of find nearest element, 10000 times 
+Real time: 35756 
+User time: 33910 
+System time: 1850 
+
+
+Time of add and delete, 1000 times 
+Real time: 127 
+User time: 104 
+System time: 23 
+
+
+} 
+
+-01
+
+Array size: 100, Block size: 10, Array allocation type: Dynamic 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: 2353 
+User time: 2351 
+System time: 0 
+
+
+Time of add then delete, 1000 times 
+Real time: 144 
+User time: 72 
+System time: 72 
+
+
+Time of find nearest element, 10000 times 
+Real time: 37259 
+User time: 36170 
+System time: 1089 
+
+
+Time of add and delete, 1000 times 
+Real time: 154 
+User time: 139 
+System time: 14 
+
+
+} 
+-0s
+
+Array size: 100, Block size: 10, Array allocation type: Dynamic 
+{ 
+ 
+Time of creating array, 10000 times 
+Real time: 2494 
+User time: 0 
+System time: 2492 
+
+
+Time of add then delete, 1000 times 
+Real time: 143 
+User time: 0 
+System time: 143 
+
+
+Time of find nearest element, 10000 times 
+Real time: 35675 
+User time: 33832 
+System time: 1843 
+
+
+Time of add and delete, 1000 times 
+Real time: 145 
+User time: 119 
+System time: 26 
+
+
+} 

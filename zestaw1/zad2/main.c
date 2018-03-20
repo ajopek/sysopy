@@ -5,32 +5,44 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include "string_array_lib.h"
+#include "dlfcn.h"
 
-#define _STATIC
 #define NUMBER_OF_TESTS 10000
 #define FILE_NAME "raport.txt"
+#define DL_NAME "libzad1_shared.so"
 
 typedef struct timespec timespec;
 typedef struct timeval timeval;
 typedef struct rusage rusage;
-typedef struct timestamp timestamp;
 typedef enum array_type array_type;
 
-struct timestamp{
-    int64_t real;
-    int64_t user;
-    int64_t system;
-};
+typedef struct timestamp{
+    long real;
+    long user;
+    long system;
+} timestamp;
+
+typedef struct functions {
+
+    int (* init)(enum array_type, size_t, int, string_array**);
+
+    void (* delete_array)(string_array*);
+
+    void (*add_block)(string_array*, int, char *);
+
+    void (* delete_block)(string_array*, int);
+
+    int (* find_nearest)(string_array*, int);
+} functions;
 
 //TODO: Handle possible array bigger than memory
 
-// Loading libraries -------------------------
 // Testing functions -------------------------
-string_array* create(array_type alloc_type, int size, int block_size, FILE* file);
-string_array* create_with_content(array_type type, int size, int block_size);
-void add_and_delete(string_array* array_struct, int number_of_blocks, FILE* file);
-void search_element(string_array* array_struct, int value, FILE* file);
-void add_then_delete(string_array* array_struct, int number_of_blocks, FILE* file);
+string_array* create(array_type alloc_type, int size, int block_size, FILE* file, functions);
+string_array* create_with_content(array_type type, int size, int block_size, functions);
+void add_and_delete(string_array* array_struct, int number_of_blocks, FILE* file, functions);
+void search_element(string_array* array_struct, int value, FILE* file, functions);
+void add_then_delete(string_array* array_struct, int number_of_blocks, FILE* file, functions);
 // Time measurement --------------------------
 timestamp get_timestamp();
 void print_timestamp(FILE* file,timestamp timestamp);
@@ -43,13 +55,44 @@ void add_testcase_description(FILE* file, int size, int block_size, array_type a
 void add_testcase_ending(FILE* file);
 // Helper functions --------------------------
 void random_string(int length, char* string);
-void fill_random_content(string_array* array);
+void fill_random_content(string_array* array, functions);
 void print_help();
 // -------------------------------------------
 
 
 int main(int argc, char* argv[]) {
+    functions functions;
+#ifdef DYNAMIC_LOADING
+    void *handle = dlopen(DL_NAME, RTLD_LAZY);
+    if(!handle) {
+        fprintf(stderr, "Could not open library %s: %s\n", DL_NAME, dlerror());
+        return(1);
+    }
+    
+    functions.init = dlsym(handle, "init");
+
+    functions.delete_array = dlsym(handle, "delete_array");
+
+    functions.add_block = dlsym(handle, "add_block");
+
+    functions.find_nearest = dlsym(handle, "find_nearest");
+
+    functions.delete_block = dlsym(handle, "delete_block");
+
+#else
+    functions.init = &init;
+
+    functions.delete_array = &delete_array;
+
+    functions.add_block = &add_block;
+
+    functions.find_nearest = &find_nearest;
+
+    functions.delete_block = &delete_block;
+#endif
+
     srand((unsigned int)time(0));
+
     string_array* array_with_content = NULL;
     string_array* array = NULL;
     /** ------------------------------------------------------
@@ -67,7 +110,7 @@ int main(int argc, char* argv[]) {
     FILE* file = open_file(FILE_NAME);
     array_type alloc_type;
     int knownt_type = 0;
-    for (i = 0; i < argc && i < 4; ++i) {
+    for (i = 0; i < argc && i < 5; ++i) {
         if(strcmp("static", argv[argv_i]) == 0 && !created) {
             alloc_type = STATIC;
             knownt_type = 1;
@@ -82,8 +125,8 @@ int main(int argc, char* argv[]) {
 
             add_testcase_description(file, size, block_size, alloc_type);
 
-            array = create(alloc_type, size, block_size, file);
-            array_with_content = create_with_content(alloc_type, size, block_size);
+            array = create(alloc_type, size, block_size, file, functions);
+            array_with_content = create_with_content(alloc_type, size, block_size, functions);
 
             if(array == NULL || array_with_content == NULL){
                 fclose(file);
@@ -94,18 +137,18 @@ int main(int argc, char* argv[]) {
         } else if(strcmp("add_then_delete", argv[argv_i]) == 0 && created) {
             num_arg = atoi(argv[++argv_i]);
 
-            add_then_delete(array, num_arg, file);
+            add_then_delete(array, num_arg, file, functions);
 
 
         } else if(strcmp("search", argv[argv_i]) == 0 && created) {
             num_arg = atoi(argv[++argv_i]);
 
-            search_element(array_with_content, num_arg, file);
+            search_element(array_with_content, num_arg, file, functions);
 
         } else if(strcmp("add_and_delete", argv[argv_i]) == 0 && created) {
             num_arg = atoi(argv[++argv_i]);
 
-            add_and_delete(array, num_arg, file);
+            add_and_delete(array, num_arg, file, functions);
 
         } else {
             print_help();
@@ -115,8 +158,12 @@ int main(int argc, char* argv[]) {
     }
     add_testcase_ending(file);
     fclose(file);
-    if(array != NULL) delete_array(array);
-    if(array_with_content != NULL) delete_array(array_with_content);
+    if(array != NULL) functions.delete_array(array);
+    if(array_with_content != NULL) functions.delete_array(array_with_content);
+
+    #ifdef DYNAMIC_LOADING
+        dlclose(handle);
+    #endif
     return 0;
 }
 
@@ -125,18 +172,19 @@ int main(int argc, char* argv[]) {
  * ---------------------------------------------------------------------------------------
  */
 
-string_array* create(array_type alloc_type, int size, int block_size, FILE* file) {
+string_array* create(array_type alloc_type, int size, int block_size, FILE* file, functions functions) {
     //printf("Creating static array \n");
     int i;
 
     string_array** created_arrays = malloc(sizeof(string_array*) * NUMBER_OF_TESTS);
     timestamp start = get_timestamp();
+
     for (i = 0; i < NUMBER_OF_TESTS; ++i) {
         created_arrays[i] = malloc(sizeof(string_array));
-        if(init(alloc_type, 0, block_size, &created_arrays[i])) {
+        if(functions.init(alloc_type, 0, block_size, &created_arrays[i])) {
             int j;
             for (j = 0; j < i ; ++i) {
-                delete_array(created_arrays[j]);
+                functions.delete_array(created_arrays[j]);
             }
             return NULL;
         }
@@ -146,34 +194,34 @@ string_array* create(array_type alloc_type, int size, int block_size, FILE* file
 
     string_array* result = created_arrays[0];
     for (i = 1; i < NUMBER_OF_TESTS; ++i) {
-        delete_array(created_arrays[i]);
+        functions.delete_array(created_arrays[i]);
     }
     free(created_arrays);
     return result;
 }
 
-string_array* create_with_content(array_type array_type,int size, int block_size){
+string_array* create_with_content(array_type array_type,int size, int block_size, functions functions){
     //printf("Creating static array with content\n");
     string_array* result = malloc(sizeof(string_array));
-    if(init(array_type, size, block_size, &result)) {
+    if(functions.init(array_type, size, block_size, &result)) {
         return NULL;
     }
-    fill_random_content(result);
+    fill_random_content(result, functions);
     return result;
 }
 
-void search_element(string_array* array_struct, int value, FILE* file) {
+void search_element(string_array* array_struct, int value, FILE* file, functions functions) {
     //printf("Finding nearest \n");
     int i;
     timestamp start = get_timestamp();
     for(i = 0; i < NUMBER_OF_TESTS; ++i){
-        find_nearest(array_struct, value);
+        functions.find_nearest(array_struct, value);
     }
     timestamp end = get_timestamp();
     print_time(file, start, end, "find nearest element", NUMBER_OF_TESTS);
 };
 
-void add_and_delete(string_array* array_struct, int number_of_blocks, FILE* file) {
+void add_and_delete(string_array* array_struct, int number_of_blocks, FILE* file, functions functions) {
     int i;
     //printf("Adding and deleting random %i blocks \n", number_of_blocks);
     char *string = malloc((array_struct -> block_size) * sizeof(char));
@@ -181,15 +229,15 @@ void add_and_delete(string_array* array_struct, int number_of_blocks, FILE* file
     for (i = 0; i < number_of_blocks ; ++i) {
         int index = i;
         random_string(array_struct -> block_size, string);
-        add_block(array_struct, index, string);
-        delete_block(array_struct, index);
+        functions.add_block(array_struct, index, string);
+        functions.delete_block(array_struct, index);
     }
     timestamp end = get_timestamp();
     print_time(file, start, end, "add and delete", number_of_blocks);
     free(string);
 };
 
-void add_then_delete(string_array* array_struct, int number_of_blocks, FILE* file) {
+void add_then_delete(string_array* array_struct, int number_of_blocks, FILE* file, functions functions) {
     int i;
     //printf("Adding random %i blocks \n", number_of_blocks);
     char *string = malloc((array_struct -> block_size) * sizeof(char));
@@ -197,12 +245,12 @@ void add_then_delete(string_array* array_struct, int number_of_blocks, FILE* fil
     for (i = 0; i < number_of_blocks ; ++i) {
         int index = i;
         random_string(array_struct -> block_size, string);
-        add_block(array_struct, index, string);
+        functions.add_block(array_struct, index, string);
     }
 
     for (i = 0; i < number_of_blocks ; ++i) {
         int index = i;
-        delete_block(array_struct, index);
+        functions.delete_block(array_struct, index);
     }
 
     timestamp end = get_timestamp();
@@ -221,6 +269,7 @@ timestamp get_timestamp() {
     gettimeofday(&time, 0);
     getrusage(RUSAGE_SELF, &usage);
     timestamp result = {get_time(time), get_time(usage.ru_utime), get_time(usage.ru_stime)};
+    return result;
 }
 
 void print_timestamp(FILE* file, timestamp to_print) {
@@ -235,8 +284,8 @@ void print_timestamp(FILE* file, timestamp to_print) {
 }
 
 
-int64_t get_time(timeval time) {
-    return (int64_t)time.tv_sec * 1000000 + (int64_t)time.tv_usec;
+long get_time(timeval time) {
+    return (long)time.tv_sec * 1000000 + (long)time.tv_usec;
 }
 
 timestamp stamp_diff(timestamp start, timestamp end) {
@@ -297,12 +346,12 @@ void random_string(int length, char* string) {
     string[i] = '\0';
 }
 
-void fill_random_content(string_array* array) {
+void fill_random_content(string_array* array, functions functions) {
     int i;
     char *string = malloc((array -> block_size) * sizeof(char));
     for(i = 0; i < array -> size; ++i) {
         random_string(array -> block_size, string);
-        add_block(array, i, string);
+        functions.add_block(array, i, string);
     }
     free(string);
 };
@@ -310,9 +359,9 @@ void fill_random_content(string_array* array) {
 void print_help(){
     printf("Usage of program: \n"
                    "Program will take 4 arguments, which specify operations to test. \n"
-                   "Available operations: \n"
+                   "Avaliable operations: \n"
                    "static | dynamic - set the type of used array, needst to be first argument\n"
-                   "create_array size block_size - needs to be the second argument \n"
+                   "create_table size block_size - needs to be the second argument \n"
                    "add_then_delete number - add number of random blocks then delete them \n"
                    "search value - search for block with nearest ascii sum to value \n"
                    "add_and_delete number - add and delete number of random blocks");
