@@ -20,11 +20,11 @@ add_library(zad1_shared SHARED ${ZAD1_SOURCE_FILES})
 # Declare executables
 add_executable(zad2_with_static ${ZAD2_SOURCE_FILES})
 add_executable(zad2_with_shared ${ZAD2_SOURCE_FILES})
-#add_executable(zad2_with_dynamic ${ZAD2_SOURCE_FILES})
+add_executable(zad2_with_dynamic ${ZAD2_SOURCE_FILES})
 
 
-#set_target_properties(zad2_with_dynamic
-#        PROPERTIES COMPILE_FLAGS "-D DYNAMIC_LOADING -ldl")
-
+set_target_properties(zad2_with_dynamic
+        PROPERTIES COMPILE_FLAGS "-D DYNAMIC_LOADING -fPIC  -ldl")
+target_link_libraries(zad2_with_dynamic ${CMAKE_DL_LIBS})
 target_link_libraries(zad2_with_static zad1_static)
 target_link_libraries(zad2_with_shared zad1_shared)
