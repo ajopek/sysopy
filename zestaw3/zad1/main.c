@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
         int flags = 0;
         nftw(path, &fn_nftw, nopenfd, flags);
     }
-    else traverse_directory(path, compare, parse_string_date(date));
+    else traverse_directory(path, compare, date);
 
     return 0;
 
@@ -94,6 +94,7 @@ int traverse_directory(char* path, int (*comparator)(time_t, time_t), time_t dat
             struct stat* stat_buffer = malloc(sizeof(struct stat));
             stat(abs_path, stat_buffer);
             if(comparator(date, stat_buffer->st_mtime)) {
+                printf("Process %i \n", getpid());
                 print_file_info(entry, stat_buffer, abs_path);
             }
             free(stat_buffer);
@@ -105,7 +106,10 @@ int traverse_directory(char* path, int (*comparator)(time_t, time_t), time_t dat
                 exit(1);
             } else if(pid == 0) { // child process
                 traverse_directory(abs_path, comparator, date);
+                free(abs_path);
                 return 0;
+            } else {
+                printf("Parent %i, created %i to traverse %s \n", getpid(), pid, abs_path);
             }
         }
         free(abs_path);
@@ -169,13 +173,13 @@ void print_file_info(dirent* file, struct stat* stat_buffer, char* abs_path) {
 }
 
 int greater(time_t a, time_t b){
-    return difftime(a, b) > 0.0001 ? 1 : 0;
+    return difftime(a, b) > 0.00001 ? 1 : 0;
 };
 int equal(time_t a, time_t b) {
-    return fabs(difftime(a, b)) < 0.0001 ? 1 : 0;
+    return fabs(difftime(a, b)) < 0.00001 ? 1 : 0;
 };
 int smaller(time_t a, time_t b) {
-    return difftime(a, b) < 0.0001 ? 1 : 0;
+    return difftime(a, b) < 0.00001 ? 1 : 0;
 };
 
 void print_help(){
@@ -187,7 +191,7 @@ void print_help(){
 time_t parse_string_date(char* string) {
     struct tm time;
     time.tm_mon = 0;
-    time.tm_year = 2018 - 1900;
+    time.tm_year = 2017 - 1900;
     //strptime(string, "%Y-%m-%d %H:%M:%S", &time);
     return mktime(&time);
 };
