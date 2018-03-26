@@ -63,7 +63,7 @@ int execute_line(FILE* file, int hard_cpu_time, int hard_memory_size) {
 int exec_command(char *const arguments[], int hard_cpu_time, int hard_memory_size) {
     pid_t pid = fork();
     int status;
-    if(pid != 0) {
+    if(pid > 0) {
         monitor_child(pid, &status);
         if(status != 0) {
             printf("Executing command %s", arguments[0]);

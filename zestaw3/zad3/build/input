@@ -1,0 +1,6 @@
+ls -la -r
+echo a b c
+   echo 1 2 3
+echo hi
+../example/mem_err 100 5
+../example/time_err
