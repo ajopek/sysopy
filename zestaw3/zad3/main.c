@@ -95,9 +95,9 @@ int exec_command(char *const arguments[], int hard_cpu_time, int hard_memory_siz
             return 1;
         }
         execvp(arguments[0], arguments);
+        printf("Exec failed.");
+        exit(1);
     }
-
-    return 1;
 }
 /** ---------------------------------------------------------------------------------------
  * Process monitoring
