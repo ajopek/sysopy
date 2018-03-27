@@ -13,7 +13,7 @@ typedef struct dirent dirent;
 
 // dir handling-------------------
 DIR* open_dir(char* name);
-void print_file_info(dirent* file, struct stat* stat_buffer, char* abs_path);
+void print_file_info(dirent* file, const struct stat* stat_buffer,const char* abs_path);
 char* get_absolute_path(char* path, char* file_name);
 int traverse_directory(char* path, int (*comparator)(time_t, time_t), time_t date);
 // comparators -------------------
@@ -145,7 +145,7 @@ char* get_absolute_path(char* path, char* file_name) {
     return result;
 }
 
-char* get_permissions(struct stat* stat_buffer) {
+char* get_permissions(const struct stat* stat_buffer) {
     char* permissions = malloc(sizeof(char) * 11);
     permissions[0] = S_ISDIR(stat_buffer->st_mode) ? 'd' : '-';
     permissions[1] = (stat_buffer->st_mode & S_IRUSR) ? 'r' : '-';
@@ -161,7 +161,7 @@ char* get_permissions(struct stat* stat_buffer) {
     return permissions;
 }
 
-void print_file_info(dirent* file, struct stat* stat_buffer, char* abs_path) {
+void print_file_info(dirent* file, const struct stat* stat_buffer,const char* abs_path) {
     char* permissions =  get_permissions(stat_buffer);
     printf("%s\t%lld\t%s\t%s \n",
            abs_path,
