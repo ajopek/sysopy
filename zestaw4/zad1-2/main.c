@@ -5,7 +5,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#define SCRIPT_PATH "date_script.sh"
+#define SCRIPT_PATH "./date_script.sh"
 
 // child process handlers
 void start_child();
@@ -14,7 +14,7 @@ void end_child();
 void sigtstp_handler(int signum, siginfo_t *siginfo, void *context);
 void sigint_handler(int _signum);
 
-sig_atomic_t is_alive; // Program pause flag
+sig_atomic_t is_alive = 1; // Program pause flag
 pid_t child_pid;
 
 int main(int argc, char *argv[]) {
@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize program
     start_child();
+    while(1);
 }
 
 /**
@@ -46,13 +47,18 @@ void start_child() {
         child_pid = pid;
     } else {
         // child process
-        execvp(SCRIPT_PATH, NULL);
+        char *args[2];
+        args[0] = SCRIPT_PATH;
+        args[1] = NULL;
+        execvp(SCRIPT_PATH, args);
         // exec returned, smth failed
         printf("Exec failed.");
         exit(1);
     }
 };
-void end_child();
+void end_child() {
+    kill(child_pid, SIGKILL);
+};
 
 /**
  * Signal handlers
