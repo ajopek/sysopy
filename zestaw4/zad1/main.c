@@ -1,10 +1,9 @@
 #include <stdio.h>
 #include <signal.h>
-#include <string.h>
 #include <zconf.h>
 #include <time.h>
 #include <stdlib.h>
-
+#include <string.h>
 
 
 // Signal handlers
