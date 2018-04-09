@@ -8,32 +8,30 @@
 #include <time.h>
 #include <string.h>
 
-void sigusr1_action(int signum, siginfo_t *siginfo, void *context);
+void sigusr2_action(int signum, siginfo_t *siginfo, void *context);
 
 int main(int argc, char* argv[]) {
     // Handle permission signal
     // SIGUSR1
-    struct sigaction sigusr1_act;
-    memset(&sigusr1_act, '\0', sizeof(struct sigaction));
-    sigusr1_act.sa_flags = SA_SIGINFO;
-    sigusr1_act.sa_sigaction = &sigusr1_action;
-    sigusr1_act.
-
-    // Wait and send permission request
-    srand(time(NULL));
-    int waiting_time = rand() % 10;
-    sleep(waiting_time);
-    printf("%i \n", waiting_time);
-
-    sigset_t mask;
-    sigfillset(&mask);
-    sigdelset(&mask, SIGUSR1);
-
-    sigsuspend(&mask);
-    return 0;
+    int rndm;
+    srand(time(NULL) + getpid());
+    struct sigaction act;
+    memset(&act, 0, sizeof(act));
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = SA_SIGINFO | SA_RESTART;
+    act.sa_sigaction = sigusr2_action;
+    sigaction(SIGUSR2, &act, NULL);
+    sleep(rndm = rand()%10 + 1);
+    //kill(getppid(), SIGUSR1);
+    pause();
+    union sigval a;
+    a.sival_int = rndm;
+    printf("ASD");
+    //sigqueue(getppid(), rand() % (SIGRTMAX - SIGRTMIN) + SIGRTMIN, a);
+    exit(rndm);
 }
 
-void sigusr1_action(int signum, siginfo_t *siginfo, void *context) {
-    printf("Got signal");
+void sigusr2_action(int signum, siginfo_t *siginfo, void *context) {
+    //printf("Got signal");
     //kill(getppid(), SIGRTMIN + rand() % (SIGRTMAX - SIGRTMIN));
 }

@@ -4,11 +4,13 @@
 #include <zconf.h>
 #include <stdlib.h>
 #include <wait.h>
+#include <time.h>
 
-#define CHILD_SCRIPT "./child"
+#define CHILD_SCRIPT "./child2"
 
 // Signal handlers
 void sigusr1_action(int signum, siginfo_t *siginfo, void *context);
+void sigusr2_action(int signum, siginfo_t *siginfo, void *context);
 void sigchld_action(int signum, siginfo_t *siginfo, void *context);
 void sigint_action(int signum, siginfo_t *siginfo, void *context);
 void sigrt_action(int signum, siginfo_t *siginfo, void *context);
@@ -46,41 +48,23 @@ int main(int argc, char* argv[]) {
     children_pid = malloc(sizeof(pid_t) * N);
     request_pid = malloc(sizeof(pid_t) * K);
 
-    // At exit (reversed order of execution compared to registration)
-    // Free pids arrays
-    //atexit(free_pids_arrays);
-    // Terminate all spawned children
-    //atexit(terminate_children);
-
     // Handle signals
-    sigset_t used_signals;
-    sigemptyset(&used_signals);
-    sigaddset(&used_signals, SIGUSR1);
-    sigaddset(&used_signals, SIGCHLD);
-    sigaddset(&used_signals, SIGINT);
-    for (i = SIGRTMIN; i <= SIGRTMAX; ++i) {
-        sigaddset(&used_signals, i);
-    }
 
     struct sigaction sig_act;
+    sigemptyset(&sig_act.sa_mask);
     memset(&sig_act, '\0', sizeof(struct sigaction));
-    sig_act.sa_mask = used_signals;
-    sig_act.sa_flags = SA_SIGINFO;
+    sig_act.sa_flags = SA_SIGINFO | SA_RESTART;
 
     // SIGUSR1
-    sig_act.sa_sigaction = &sigusr1_action;
+    sig_act.sa_sigaction = sigusr1_action;
     sigaction(SIGUSR1, &sig_act, NULL);
 
-    // SIGCHLD
-    sig_act.sa_sigaction = &sigchld_action;
-    sigaction(SIGCHLD, &sig_act, NULL);
-
     // SIGINT
-    sig_act.sa_sigaction = &sigint_action;
+    sig_act.sa_sigaction = sigint_action;
     sigaction(SIGINT, &sig_act, NULL);
 
     // SIGRT
-    sig_act.sa_sigaction = &sigrt_action;
+    sig_act.sa_sigaction = sigrt_action;
     for (i = SIGRTMIN; i <= SIGRTMAX; ++i) {
         sigaction(i, &sig_act, NULL);
     }
@@ -93,11 +77,7 @@ int main(int argc, char* argv[]) {
 
     // Process signals
     while (requests_num < K);
-    // Send confirmation to all processes that already requested
-    for (i = 0; i < K; i++){
-        kill(SIGUSR1, request_pid[i]);
-        printf("Send to %i \n", request_pid[i]);
-    }
+
 
     while(alive_children) {
         if(exit_flag) {
@@ -106,7 +86,7 @@ int main(int argc, char* argv[]) {
             exit(0);
         }
     };
-    terminate_children();
+
     free_pids_arrays();
     exit(0);
 }
@@ -115,25 +95,28 @@ int main(int argc, char* argv[]) {
  * Signal handlers
  */
 
+void sigusr2_action(int signum, siginfo_t *siginfo, void *context){
+    //ignored
+    printf("ASD");
+};
+
 void sigusr1_action(int signum, siginfo_t *siginfo, void *context) {
-    ++requests_num;
     pid_t child_pid = siginfo->si_pid;
+    int i;
     if (requests_num < K) {
-        request_pid[requests_num-1] = child_pid;
+        request_pid[requests_num] = child_pid;
+    } else if(requests_num == K) {
+        // Send confirmation to all processes that already requested
+        for (i = 0; i < K; i++){
+            kill(SIGUSR2, request_pid[i]);
+            printf("Send to %i \n", request_pid[i]);
+        }
     } else {
-        kill(SIGUSR1, child_pid);
+        kill(SIGUSR2, child_pid);
         printf("Send to %i \n", child_pid);
     }
+    ++requests_num;
     printf("Got signal SIGUSR1 from process pid: %i \n", (int)child_pid);
-}
-
-void sigchld_action(int signum, siginfo_t *siginfo, void *context) {
-    pid_t child_pid = siginfo->si_pid;
-    alive_children--;
-    int exit_status;
-    wait(&exit_status);
-    exit_status = WIFEXITED(&exit_status);
-    printf("Child pid: %i, exited with status: %i \n", child_pid, exit_status);
 }
 
 void sigint_action(int signum, siginfo_t *siginfo, void *context) {
@@ -143,6 +126,11 @@ void sigint_action(int signum, siginfo_t *siginfo, void *context) {
 void sigrt_action(int signum, siginfo_t *siginfo, void *context) {
     pid_t child_pid = siginfo->si_pid;
     printf("Got signal SIGMIN+%i, from child pid: %i \n", signum - SIGRTMIN, child_pid);
+    alive_children--;
+    int exit_status;
+    waitpid(child_pid, &exit_status, 1);
+    exit_status = WIFEXITED(&exit_status);
+    printf("Child pid: %i, exited with status: %i \n", child_pid, siginfo->si_value.sival_int);
 }
 
 
@@ -156,17 +144,24 @@ pid_t spawn_child() {
         printf("Fork failed \n");
         exit(1);
     } else if (pid) {
-        // parent process
         return pid;
     } else {
         // child process
-        char *args[2];
-        args[0] = CHILD_SCRIPT;
-        args[1] = NULL;
-        execvp(CHILD_SCRIPT, args);
-        // exec returned, something failed
-        printf("Exec failed. \n");
-        exit(1);
+        int rndm;
+        srand(time(NULL) + getpid());
+        struct sigaction act;
+        memset(&act, 0, sizeof(act));
+        sigemptyset(&act.sa_mask);
+        act.sa_flags = SA_SIGINFO | SA_RESTART;
+        act.sa_sigaction = sigusr2_action;
+        sigaction(SIGUSR2, &act, NULL);
+        sleep(rndm = rand()%10 + 1);
+        kill(getppid(), SIGUSR1);
+        pause();
+        union sigval a;
+        a.sival_int = rndm;
+        sigqueue(getppid(), rand() % (SIGRTMAX - SIGRTMIN) + SIGRTMIN, a);
+        exit(rndm);
     }
 };
 void terminate_child(pid_t child_pid) {
