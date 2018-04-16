@@ -67,6 +67,7 @@ int main(int argc, char* argv[]) {
         while(1);
 
     } else if(pid > 0) {
+        sleep(1);
          switch (type) {
              case 0:
                  sig_act.sa_sigaction = &sigusr1_parent_action;
