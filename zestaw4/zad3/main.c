@@ -4,12 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-void sigusr1_child_action(int signum, siginfo_t *siginfo, void *context);
-void sigusr1_parent_action(int signum, siginfo_t *siginfo, void *context);
-void sigusr2_child_action(int signum, siginfo_t *siginfo, void *context);
-void sigrtmin_child_action(int signum, siginfo_t *siginfo, void *context);
-void sigrtmin_parent_action(int signum, siginfo_t *siginfo, void *context);
-void sigrtmax_child_action(int signum, siginfo_t *siginfo, void *context);
+void sigusr1_child_action(int signum);
+void sigusr1_parent_action(int signum);
+void sigusr2_child_action(int signum);
+void sigrtmin_child_action(int signum);
+void sig_parent_action(int signum);
+void sigrtmax_child_action(int signum);
 
 sig_atomic_t child_signals = 0;
 sig_atomic_t parent_signals = 0;
@@ -38,26 +38,26 @@ int main(int argc, char* argv[]) {
     struct sigaction sig_act;
     memset(&sig_act, '\0', sizeof(struct sigaction));
     sig_act.sa_mask = used_signals;
-    sig_act.sa_flags = SA_SIGINFO;
+    sig_act.sa_flags = 0;
 
     if(pid == 0) {
         switch (type) {
             case 0:
-                sig_act.sa_sigaction = &sigusr1_child_action;
+                sig_act.sa_handler = &sigusr1_child_action;
                 sigaction(SIGUSR1, &sig_act, NULL);
-                sig_act.sa_sigaction = &sigusr2_child_action;
+                sig_act.sa_handler = &sigusr2_child_action;
                 sigaction(SIGUSR2, &sig_act, NULL);
                 break;
             case 1:
-                sig_act.sa_sigaction = &sigusr1_child_action;
+                sig_act.sa_handler = &sigusr1_child_action;
                 sigaction(SIGUSR1, &sig_act, NULL);
-                sig_act.sa_sigaction = &sigusr2_child_action;
+                sig_act.sa_handler = &sigusr2_child_action;
                 sigaction(SIGUSR2, &sig_act, NULL);
                 break;
             case 2:
-                sig_act.sa_sigaction = &sigrtmin_child_action;
+                sig_act.sa_handler = &sigrtmin_child_action;
                 sigaction(SIGRTMIN, &sig_act, NULL);
-                sig_act.sa_sigaction = &sigrtmax_child_action;
+                sig_act.sa_handler = &sigrtmax_child_action;
                 sigaction(SIGRTMAX, &sig_act, NULL);
                 break;
             default:
@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
         sleep(1);
          switch (type) {
              case 0:
-                 sig_act.sa_sigaction = &sigusr1_parent_action;
+                 sig_act.sa_handler = &sigusr1_parent_action;
                  sigaction(SIGUSR1, &sig_act, NULL);
                  for(i = 0; i < L; i++) {
                      kill(pid, SIGUSR1);
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
                  kill(pid, SIGUSR2);
                  break;
              case 1:
-                 sig_act.sa_sigaction = &sigusr1_parent_action;
+                 sig_act.sa_handler = &sigusr1_parent_action;
                  sigaction(SIGUSR1, &sig_act, NULL);
                  for(i = 0; i < L; i++) {
                      kill(pid, SIGUSR1);
@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
                  kill(pid, SIGUSR2);
                  break;
              case 2:
-                 sig_act.sa_sigaction = &sigrtmin_parent_action;
+                 sig_act.sa_handler = &sig_parent_action;
                  sigaction(SIGRTMIN, &sig_act, NULL);
                  for(i = 0; i < L; i++) {
                      kill(pid, SIGRTMIN);
@@ -106,28 +106,30 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void sigusr1_child_action(int signum, siginfo_t *siginfo, void *context) {
+void sigusr1_child_action(int signum) {
     kill(getppid(), SIGUSR1);
     printf("Child got %i signals. \n", ++child_signals);
 }
 
-void sigusr1_parent_action(int signum, siginfo_t *siginfo, void *context) {
+void sigusr1_parent_action(int signum) {
     printf("Parent got %i signals. \n", ++parent_signals);
 }
 
-void sigusr2_child_action(int signum, siginfo_t *siginfo, void *context) {
+void sigusr2_child_action(int signum) {
     _Exit(1);
 }
 
-void sigrtmin_child_action(int signum, siginfo_t *siginfo, void *context) {
+void sigrtmin_child_action(int signum) {
     kill(getppid(), SIGRTMIN);
     printf("Child got %i signals. \n", ++child_signals);
 }
 
-void sigrtmin_parent_action(int signum, siginfo_t *siginfo, void *context) {
-    printf("Parent got %i signals. \n", ++parent_signals);
+void sig_parent_action(int signum) {
+    if(signum == SIGRTMIN) {
+        printf("Parent got %i signals. \n", ++parent_signals);
+    }
 }
 
-void sigrtmax_child_action(int signum, siginfo_t *siginfo, void *context) {
+void sigrtmax_child_action(int signum) {
     _Exit(1);
 }
