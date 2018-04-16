@@ -1,135 +1,117 @@
-#include <stdio.h>
-#include <signal.h>
-#include <zconf.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <signal.h>
+#include <unistd.h>
 
-void sigusr1_child_action(int signum);
-void sigusr1_parent_action(int signum);
-void sigusr2_child_action(int signum);
-void sigrtmin_child_action(int signum);
-void sig_parent_action(int signum);
-void sigrtmax_child_action(int signum);
 
-sig_atomic_t child_signals = 0;
-sig_atomic_t parent_signals = 0;
+int child_count;
+int parent_count;
+int sent_count;
+pid_t child;
+pid_t parent;
+int mode;
 
-int main(int argc, char* argv[]) {
+void sig_parent(int sig)
+{
+    parent_count++;
+    if (sig == SIGUSR1 || sig == SIGRTMIN)
+    {
+        printf("Parent received %i signals \n", parent_count);
+    }
+    else if (sig == SIGINT)
+    {
+        printf("Parent process: received SIGINT \n");
+        kill(child, (mode != 3) ? SIGUSR2 : SIGRTMAX);
+        exit(EXIT_SUCCESS);
+    }
+}
+
+void sig_child(int sig)
+{
+    child_count++;
+    if (sig == SIGUSR1 || sig == SIGRTMIN)
+    {
+        printf("Child process: received %i signals\n", child_count);
+        kill(parent, (sig == SIGUSR1) ? SIGUSR1 : SIGRTMIN);
+    }
+    else if (sig == SIGUSR2 || sig == SIGRTMAX)
+    {
+        printf("Child process: received %s \n", (sig == SIGUSR2) ? "SIGUSR2" : "SIGRTMAX");
+        exit(EXIT_SUCCESS);
+    }
+}
+
+void parent_function(int amount)
+{
+    struct sigaction act;
+    act.sa_handler = sig_parent;
+    sigfillset(&act.sa_mask);
+    sigaddset(&act.sa_mask, SIGUSR1);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, NULL) < -1 ||
+        sigaction((mode != 3) ? SIGUSR1 : SIGRTMIN, &act, NULL) < -1)
+    {
+        exit(EXIT_FAILURE);
+    }
     int i;
-    int L, type;
-
-    if(argc < 3) {
-        exit(1);
+    for (i = 0; i < amount; i++)
+    {
+        sent_count++;
+        printf("Parent process: send %i signals \n", sent_count);
+        kill(child, (mode != 3) ? SIGUSR1 : SIGRTMIN);
+        if (mode == 2) pause();
     }
+    kill(child, (mode != 3) ? SIGUSR2 : SIGRTMAX);
+    alarm(1);
+    while(parent_count < amount) pause();
+}
 
-    L = atoi(argv[1]);
-    type = atoi(argv[2]);
+void child_function(void)
+{
+    struct sigaction act;
+    act.sa_handler = sig_child;
+    sigfillset(&act.sa_mask);
+    sigaddset(&act.sa_mask, SIGUSR1);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, NULL) < -1 ||
+        sigaction((mode != 3) ? SIGUSR1 : SIGRTMIN, &act, NULL) < -1 ||
+        sigaction((mode != 3) ? SIGUSR2 : SIGRTMAX, &act, NULL) < -1)
+    {
+        exit(EXIT_FAILURE);
+    }
+    while (1) {pause();}
+}
 
-    // Handle signals
-    sigset_t used_signals;
-    sigemptyset(&used_signals);
-    sigaddset(&used_signals, SIGUSR1);
-    sigaddset(&used_signals, SIGUSR2);
-    sigaddset(&used_signals, SIGRTMIN);
-    sigaddset(&used_signals, SIGRTMAX);
+int main(int argc, char const *argv[])
+{
+    if (argc < 3)
+    {
+        exit(EXIT_FAILURE);
+    }
+    int amount = atoi(argv[1]);
+    mode = atoi(argv[2]);
 
-    pid_t pid = fork();
+    sigset_t newmask;
+    sigset_t oldmask;
+    sigfillset(&newmask);
+    sigdelset(&newmask, SIGINT);
+    sigdelset(&newmask, SIGUSR1);
+    sigdelset(&newmask, SIGUSR2);
+    sigdelset(&newmask, SIGRTMIN);
+    sigdelset(&newmask, SIGRTMAX);
+    sigprocmask(SIG_SETMASK, &newmask, &oldmask);
 
-    struct sigaction sig_act;
-    memset(&sig_act, '\0', sizeof(struct sigaction));
-    sig_act.sa_mask = used_signals;
-    sig_act.sa_flags = 0;
-
-    if(pid == 0) {
-        switch (type) {
-            case 0:
-                sig_act.sa_handler = &sigusr1_child_action;
-                sigaction(SIGUSR1, &sig_act, NULL);
-                sig_act.sa_handler = &sigusr2_child_action;
-                sigaction(SIGUSR2, &sig_act, NULL);
-                break;
-            case 1:
-                sig_act.sa_handler = &sigusr1_child_action;
-                sigaction(SIGUSR1, &sig_act, NULL);
-                sig_act.sa_handler = &sigusr2_child_action;
-                sigaction(SIGUSR2, &sig_act, NULL);
-                break;
-            case 2:
-                sig_act.sa_handler = &sigrtmin_child_action;
-                sigaction(SIGRTMIN, &sig_act, NULL);
-                sig_act.sa_handler = &sigrtmax_child_action;
-                sigaction(SIGRTMAX, &sig_act, NULL);
-                break;
-            default:
-                exit(1);
-        }
-
-        while(1);
-
-    } else if(pid > 0) {
+    parent = getpid();
+    child_count = sent_count = parent_count = 0;
+    if ((child = fork()) < 0)
+    {
+        exit(EXIT_FAILURE);
+    }
+    if (child == 0) child_function();
+    else {
         sleep(1);
-         switch (type) {
-             case 0:
-                 sig_act.sa_handler = &sigusr1_parent_action;
-                 sigaction(SIGUSR1, &sig_act, NULL);
-                 for(i = 0; i < L; i++) {
-                     kill(pid, SIGUSR1);
-                     printf("Send %i signals to child. \n", i);
-                 }
-                 kill(pid, SIGUSR2);
-                 break;
-             case 1:
-                 sig_act.sa_handler = &sigusr1_parent_action;
-                 sigaction(SIGUSR1, &sig_act, NULL);
-                 for(i = 0; i < L; i++) {
-                     kill(pid, SIGUSR1);
-                     pause();
-                     printf("Send %i signals to child. \n", i+1);
-                 }
-                 kill(pid, SIGUSR2);
-                 break;
-             case 2:
-                 sig_act.sa_handler = &sig_parent_action;
-                 sigaction(SIGRTMIN, &sig_act, NULL);
-                 for(i = 0; i < L; i++) {
-                     kill(pid, SIGRTMIN);
-                     printf("Send %i signals to child. \n", i+1);
-                 }
-                 kill(pid, SIGRTMAX);
-                 break;
-             default:
-                 exit(1);
-         }
-    } else {
-        exit(1);
+        parent_function(amount);
     }
-    return 0;
-}
-
-void sigusr1_child_action(int signum) {
-    kill(getppid(), SIGUSR1);
-    printf("Child got %i signals. \n", ++child_signals);
-}
-
-void sigusr1_parent_action(int signum) {
-    printf("Parent got %i signals. \n", ++parent_signals);
-}
-
-void sigusr2_child_action(int signum) {
-    _Exit(1);
-}
-
-void sigrtmin_child_action(int signum) {
-    kill(getppid(), SIGRTMIN);
-    printf("Child got %i signals. \n", ++child_signals);
-}
-
-void sig_parent_action(int signum) {
-    if(signum == SIGRTMIN) {
-        printf("Parent got %i signals. \n", ++parent_signals);
-    }
-}
-
-void sigrtmax_child_action(int signum) {
-    _Exit(1);
+    exit(EXIT_SUCCESS);
 }
