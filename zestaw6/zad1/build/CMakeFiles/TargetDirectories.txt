@@ -1,0 +1,2 @@
+/home/student/sysopy/zestaw6/zad1/build/CMakeFiles/client.dir
+/home/student/sysopy/zestaw6/zad1/build/CMakeFiles/server.dir

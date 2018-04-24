@@ -85,8 +85,8 @@ int main() {
         int size = (int) strlen(msg->data);
         printf("Handling mirror: %s \n", msg->data);
         char* reversed = malloc(size * sizeof(char));
-
-        for(int i = 0; i < size; ++i) {
+	int i;
+        for(i = 0; i < size; ++i) {
             reversed[i] = msg->data[size - i - 1];
         }
         send(msg->client_id, reversed, size * sizeof(char));

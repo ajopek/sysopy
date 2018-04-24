@@ -1,0 +1,1 @@
+/bin/cc   -lrt    CMakeFiles/client.dir/client.c.o  -o client -rdynamic 

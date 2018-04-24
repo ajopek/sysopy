@@ -9,7 +9,6 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
-#include <zconf.h>
 #include <mqueue.h>
 #include "communication_protocol.h"
 

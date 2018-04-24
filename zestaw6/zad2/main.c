@@ -40,16 +40,20 @@ mqd_t requests_queue_id;
 int main() {
     atexit(remove_queue);
     // Create requests queue
-    if ((requests_queue_id = mq_open(SERVER_NAME, O_CREAT | O_EXCL | O_RDONLY, S_IRUSR | S_IWUSR, NULL)) < 0)
+    if ((requests_queue_id = mq_open(SERVER_NAME, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, NULL)) < 0) {
         printf("Server queue open error %s", strerror(errno));
+	exit(1);
+    }	
 
     message *received_message = malloc(MSG_SIZE);
 
     int end_flag = 0;
     ssize_t bytes_read;
     while (1) {
-        if (mq_receive(requests_queue_id, (char*)received_message, MSG_SIZE, end_flag ? O_NONBLOCK : NULL) < 0)
-            break;
+        if (mq_receive(requests_queue_id, (char*)received_message, MSG_SIZE, NULL) < 0) {
+            printf("Error: %s \n", strerror(errno));
+	    break;
+        }
         switch (received_message->mtype) {
             case Mirror:
                 //send back reversed string
@@ -79,6 +83,7 @@ int main() {
                 // No such type, send error
                 break;
         }
+	if(end_flag) break;
     }
     free(received_message);
     exit(EXIT_SUCCESS);
@@ -88,8 +93,8 @@ int main() {
         int size = (int) strlen(msg->data);
         printf("Handling mirror: %s \n", msg->data);
         char* reversed = malloc(size * sizeof(char));
-
-        for(int i = 0; i < size; ++i) {
+	int i;
+        for(i = 0; i < size; ++i) {
             reversed[i] = msg->data[size - i - 1];
         }
         send(msg->client_id, reversed, size * sizeof(char));
@@ -158,7 +163,7 @@ int main() {
 
     void remove_queue(void) {
         printf("Removing server queue. \n");
-        msgctl(requests_queue_id, IPC_RMID, NULL);
+        mq_unlink(SERVER_NAME);
     }
 
     void remove_client(int client_id) {

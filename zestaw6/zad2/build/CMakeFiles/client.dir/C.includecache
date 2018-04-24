@@ -1,0 +1,36 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/student/sysopy/zestaw6/zad2/client.c
+stdio.h
+-
+sys/types.h
+-
+sys/ipc.h
+-
+sys/msg.h
+-
+stdlib.h
+-
+string.h
+-
+time.h
+-
+errno.h
+-
+mqueue.h
+-
+communication_protocol.h
+/home/student/sysopy/zestaw6/zad2/communication_protocol.h
+
+/home/student/sysopy/zestaw6/zad2/communication_protocol.h
+fcntl.h
+-
+mqueue.h
+-
+

@@ -1,0 +1,1 @@
+/bin/cc      CMakeFiles/server.dir/main.c.o  -o server -rdynamic 
