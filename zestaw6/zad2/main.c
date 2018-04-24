@@ -39,8 +39,13 @@ mqd_t requests_queue_id;
 
 int main() {
     atexit(remove_queue);
+    struct mq_attr attr;  
+	attr.mq_flags = 0;  
+	attr.mq_maxmsg = 10;  
+	attr.mq_msgsize = sizeof(message);  
+	attr.mq_curmsgs = 0; 
     // Create requests queue
-    if ((requests_queue_id = mq_open(SERVER_NAME, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, NULL)) < 0) {
+    if ((requests_queue_id = mq_open(SERVER_NAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, NULL)) < 0) {
         printf("Server queue open error %s", strerror(errno));
 	exit(1);
     }	
@@ -50,7 +55,7 @@ int main() {
     int end_flag = 0;
     ssize_t bytes_read;
     while (1) {
-        if (mq_receive(requests_queue_id, (char*)received_message, MSG_SIZE, NULL) < 0) {
+        if (mq_receive(requests_queue_id, (char*)received_message, 8192, NULL) < 0) {
             printf("Error: %s \n", strerror(errno));
 	    break;
         }
@@ -103,6 +108,7 @@ int main() {
     void handle_calculate(message *msg) {
         if (strlen(msg->data) < 3) return handle_bad_request(msg);
         char *arg_end;
+        printf("Handling calc %s \n", msg->data);
         int i = 0;
         while (msg->data[i] != '+' && msg->data[i] != '-' && msg->data[i] != '/' && msg->data[i] != '*') i++;
         arg_end = msg->data + i - 1;
@@ -144,7 +150,6 @@ int main() {
         sprintf(name, "%s", msg->data);
         if ((clients[last_client_id] = mq_open(name, O_WRONLY)) < 0)
             printf("Client queue open error: %s", strerror(errno));
-        clients[last_client_id] = *(mqd_t *) msg->data;
         printf("Registered client id: %i, queue: %i \n", last_client_id, clients[last_client_id]);
         // Send client id
         int *result = malloc(sizeof(int));
@@ -179,7 +184,8 @@ void send(int client_id, void* data, size_t data_size) {
             .data = {0}
     };
     memcpy(res.data, data, data_size );
-    if(mq_send(clients[client_id], (char*) &res, MSG_SIZE, 1) < 0) {
+    printf("Sending: %i \n", *(int*)data);
+    if(mq_send(clients[client_id], (char*) &res, 8192, 1) < 0) {
         printf("Sending response to client id: %i failed: %d %s\n",
                client_id,
                errno,

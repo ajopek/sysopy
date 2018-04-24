@@ -84,12 +84,6 @@ int main(int argc, char* argv[]) {
         }
     }
     free(line);
-
-    mirror_request("123456789124124124");
-    calculate_request("12*5");
-    time_request();
-    end_request();
-
     exit(EXIT_SUCCESS);
 }
 
@@ -122,7 +116,8 @@ void send(request_type type, void* data,size_t data_size) {
 message* receive(void) {
     message* received = malloc(MSG_SIZE);
     memset(received, 0, MSG_SIZE);
-    mq_receive(server_queue_id, (char*)received, MSG_SIZE, NULL);
+    mq_receive(server_queue_id, (char*)received, 8192, NULL);
+    printf("Received: %i \n", *(int*)received->data);
     return received;
 }
 
