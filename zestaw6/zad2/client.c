@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
     }
 
     sprintf(queue_name, "/%iq", getpid());
+    printf("Queue name: %s \n", queue_name);
     atexit(remove_queue);
     set_sigint();
     if ((server_queue_id = mq_open(SERVER_NAME, O_WRONLY)) < 0)

@@ -147,6 +147,7 @@ int main() {
         // Open queue and add to clients table
         char name[MAX_DATA_LEN];
         sprintf(name, "%s", msg->data);
+        printf("Queue name %s \n", msg->data);
         if ((clients[last_client_id] = mq_open(name, O_WRONLY)) < 0)
             printf("Client queue open error: %s", strerror(errno));
         printf("Registered client id: %i, queue: %i \n", last_client_id, clients[last_client_id]);
