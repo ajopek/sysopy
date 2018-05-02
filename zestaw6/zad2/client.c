@@ -118,7 +118,7 @@ void send(request_type type, void* data,size_t data_size) {
 message* receive(void) {
     message* received = malloc(MSG_SIZE);
     memset(received, 0, MSG_SIZE);
-    mq_receive(server_queue_id, (char*)received, 8192, NULL);
+    mq_receive(client_queue_id, (char*)received, 8192, NULL);
     printf("Received: %i \n", *(int*)received->data);
     return received;
 }
