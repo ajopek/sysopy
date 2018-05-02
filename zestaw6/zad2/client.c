@@ -26,7 +26,7 @@ void time_request(void);
 void end_request(void);
 // Args handling
 // Signals
-set_sigint();
+void set_sigint();
 
 
 // GLOBAL VARS -----------------------------------------

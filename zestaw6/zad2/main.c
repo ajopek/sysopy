@@ -35,7 +35,7 @@ void remove_client(int client_id);
 void send(int client_id, void* data, size_t data_size);
 
 //Signals
-set_sigint();
+void set_sigint();
 mqd_t clients[MAX_CLIENTS_NUM];
 int last_client_id = 0;
 mqd_t requests_queue_id;
