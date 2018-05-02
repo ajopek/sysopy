@@ -10,6 +10,7 @@
 #include <time.h>
 #include <errno.h>
 #include <mqueue.h>
+#include <signal.h>
 #include "communication_protocol.h"
 
 // Queue handling
@@ -24,6 +25,8 @@ void calculate_request(char* data);
 void time_request(void);
 void end_request(void);
 // Args handling
+// Signals
+set_sigint();
 
 
 // GLOBAL VARS -----------------------------------------
@@ -47,6 +50,7 @@ int main(int argc, char* argv[]) {
 
     sprintf(queue_name, "/%iq", getpid());
     atexit(remove_queue);
+    set_sigint();
     if ((server_queue_id = mq_open(SERVER_NAME, O_WRONLY)) < 0)
         printf("Client errpr when server queue openinig: %s", strerror(errno));
     if ((client_queue_id = mq_open(queue_name, O_CREAT | O_EXCL | O_RDONLY, S_IRUSR | S_IWUSR, NULL)) < 0)
@@ -159,4 +163,24 @@ void time_request(void) {
 void end_request(void) {
     send(End, "", sizeof(char));
     exit(EXIT_SUCCESS);
+}
+
+
+void sig_handler(int sig)
+{
+    if (sig == SIGINT)
+    {
+        printf("\nShutting down\n");
+        exit(EXIT_SUCCESS);
+    }
+    else if (sig == SIGSEGV) printf("Segmentation fault");
+}
+
+void set_sigint() {
+    struct sigaction act;
+    act.sa_handler = sig_handler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, NULL) < -1) printf("Signal error");
+    if (sigaction(SIGSEGV, &act, NULL) < -1) printf("Signal error");
 }

@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <mqueue.h>
+#include <signal.h>
 #include "communication_protocol.h"
 
 #define MAX_CLIENTS_NUM 50
@@ -33,17 +34,15 @@ void remove_client(int client_id);
 // Message handling
 void send(int client_id, void* data, size_t data_size);
 
+//Signals
+set_sigint();
 mqd_t clients[MAX_CLIENTS_NUM];
 int last_client_id = 0;
 mqd_t requests_queue_id;
 
 int main() {
     atexit(remove_queue);
-    struct mq_attr attr;  
-	attr.mq_flags = 0;  
-	attr.mq_maxmsg = 10;  
-	attr.mq_msgsize = sizeof(message);  
-	attr.mq_curmsgs = 0; 
+    set_sigint();
     // Create requests queue
     if ((requests_queue_id = mq_open(SERVER_NAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, NULL)) < 0) {
         printf("Server queue open error %s", strerror(errno));
@@ -193,4 +192,23 @@ void send(int client_id, void* data, size_t data_size) {
     }
 
 
+}
+
+void sig_handler(int sig)
+{
+    if (sig == SIGINT)
+    {
+        printf("\nShutting down\n");
+        exit(EXIT_SUCCESS);
+    }
+    else if (sig == SIGSEGV) printf("Segmentation fault");
+}
+
+void set_sigint() {
+    struct sigaction act;
+    act.sa_handler = sig_handler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, NULL) < -1) printf("Signal error");
+    if (sigaction(SIGSEGV, &act, NULL) < -1) printf("Signal error");
 }
