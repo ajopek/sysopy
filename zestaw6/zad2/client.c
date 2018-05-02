@@ -47,8 +47,8 @@ int main(int argc, char* argv[]) {
 
     sprintf(queue_name, "/%iq", getpid());
     atexit(remove_queue);
-    client_queue_id = msgget(ftok(getenv("HOME"), PROJECT_ID), IPC_CREAT | 0644u);
-    server_queue_id = msgget(ftok(getenv("HOME"), PROJECT_ID), 0644u);
+    client_queue_id = mq_open(queue_name, IPC_CREAT | 0644u);
+    server_queue_id = mq_open(SERVER_NAME, O_CREAT | O_EXCL | O_RDONLY, S_IWUSR | S_IRUSR, NULL);
     if ((server_queue_id = mq_open(SERVER_NAME, O_WRONLY)) < 0)
         printf("Client errpr when server queue openinig: %s", strerror(errno));
     if ((client_queue_id = mq_open(queue_name, O_CREAT | O_EXCL | O_RDONLY, S_IRUSR | S_IWUSR, NULL)) < 0)
