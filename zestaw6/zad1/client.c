@@ -1,162 +1,175 @@
-//
-// Created by artur on 22.04.18.
-//
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
 #include <stdlib.h>
-#include <string.h>
-#include <time.h>
+#include <stdio.h>
 #include <errno.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
 #include "communication_protocol.h"
 
-// Queue handling
-void remove_queue(void);
-// Messages handling
-void send(request_type type, void* data,size_t data_size);
-message* receive(void);
-// Requests handling
-void key_request(void);
-void mirror_request(char* data);
-void calculate_request(char* data);
-void time_request(void);
-void end_request(void);
-// Args handling
-
-
-// GLOBAL VARS -----------------------------------------
+int msgqueue;
+int server;
 int client_id = -1;
-int server_queue_id;
-int client_queue_id;
 
-// MAIN ------------------------------------------------
-int main(int argc, char* argv[]) {
-    FILE *input;
-    if(argc <= 1 || strcmp("-", argv[1]) == 0) {
-        fprintf(stderr, "Reading input from stdin\n");
-        input = stdin;
-    } else {
-        input = fopen(argv[1], "r");
-        if(input == NULL) {
-            fprintf(stderr, "Opening input file '%s' failed: %s\n", argv[1], strerror(errno));
+void __exit();
+void err(const char* msg);
+void sig_handler(int sig);
+void set_sigint();
+int parse_command(char *line, int len, int* pos);
+void connect_to_server();
+void receive_reply(struct msgbuf* msg);
+
+int main(int argc, char const *argv[])
+{
+    FILE *file;
+    int intr = 1;
+    if (argc > 1)
+    {
+        file = fopen(argv[1], "r");
+        if (file == NULL) err("Commands file");
+        intr = 0;
+    }
+    else file = stdin;
+
+    set_sigint();
+    atexit(__exit);
+
+    char *buf = NULL;
+    char line[100];
+    size_t n;
+    struct msgbuf msg;
+    int count, pos, msg_id;
+
+    if ((server = msgget(ftok(getenv("HOME"), 0), 0)) < 0) err("Client->server queue");
+    if ((msgqueue = msgget(IPC_PRIVATE, S_IRWXU | S_IRWXG | S_IRWXO)) < 0) err("Server->client queue");
+
+    connect_to_server();
+    while ((count = getline(&buf, &n, file)) > 1)
+    {
+        sprintf(line, "%.*s", (buf[count-1] == '\n') ? count-1 : count, buf);
+        msg_id = parse_command(line, count, &pos);
+
+        if (msg_id == UNDEF_MSG)
+        {
+            printf("Command not recognized: %s\n", line);
+            continue;
         }
+
+        msg.mtype = msg_id;
+        sprintf(msg.mtext, "%s", line + pos);
+        msg.client_id = client_id;
+        msg.client_pid = getpid();
+        if (msgsnd(server, &msg, MAX_MSG, 0) < 0)
+        {
+            if (errno == EINVAL && intr)
+            {
+                printf("Server not found\n");
+                continue;
+            }
+            else err("Client send");
+        }
+
+        receive_reply(&msg);
     }
 
-    atexit(remove_queue);
-    client_queue_id = msgget(ftok(getenv("HOME"), PROJECT_ID), IPC_CREAT | 0644u);
-    server_queue_id = msgget(ftok(getenv("HOME"), PROJECT_ID), 0644u);
-    printf("Created queue id: %i \n", client_queue_id);
-    key_request();
-
-    char *line = NULL;
-    size_t length = 0;
-    while(getline(&line, &length, input) > 0) {
-        printf("Executing '%.*s':\n", (int) (strlen(line) - 1), line);
-
-        char* arg = strtok(line, " \n");
-        if(strcmp(arg, "Mirror") == 0) {
-            if(!(arg = strtok(NULL, " "))) {
-                fprintf(stderr, "You must provider string to be mirrored\n");
-            } else {
-                mirror_request(arg);
-            }
-        } else if(strcmp(arg, "Calc") == 0) {
-            if(!(arg = strtok(NULL, " "))) {
-                fprintf(stderr, "You must provide <operand><operator><operand>\n");
-            } else {
-                calculate_request(arg);
-            }
-        } else if(strcmp(arg, "Time") == 0) {
-            time_request();
-        } else if(strcmp(arg, "End") == 0) {
-            end_request();
-            exit(0);
-        } else {
-            fprintf(stderr, "Unknown command '%s'\n", arg);
-        }
-    }
-    free(line);
-
-    mirror_request("123456789124124124");
-    calculate_request("12*5");
-    time_request();
-    end_request();
-
+    printf("Exiting\n");
     exit(EXIT_SUCCESS);
 }
 
-// QUEUE HANDLING --------------------------------------
+int parse_command(char *line, int len, int* pos)
+{
+    int c = 0;
+    int ret;
+    char cmnd[6];
 
-void remove_queue(void) {
-    printf("Removing client queue. \n");
-    msgctl(client_queue_id, IPC_RMID, NULL);
+    while (line[c] != ' ' && c != len-1 && c < 6) c++;
+    sprintf(cmnd, "%.*s", c, line);
+    if (line[c] == ' ') while(line[c] == ' ') c++;
+    *pos = c;
+
+    if (strcmp(cmnd, "MIRROR") == 0)
+        ret = MIRROR_MSG;
+    else if (strcmp(cmnd, "CALC") == 0)
+        ret = CALC_MSG;
+    else if (strcmp(cmnd, "TIME") == 0)
+        ret = TIME_MSG;
+    else if (strcmp(cmnd, "END") == 0)
+        ret = END_MSG;
+    else ret = UNDEF_MSG;
+
+    return ret;
 }
 
-// MESSAGES HANDLING -----------------------------------
+void connect_to_server()
+{
+    struct msgbuf msg;
 
-void send(request_type type, void* data,size_t data_size) {
-    message req = {
-            .mtype = type,
-            .client_id = client_id,
-            .data = {0}
-    };
-    memcpy(req.data, data, data_size);
-    if(msgsnd(server_queue_id, &req, MSG_SIZE, 0) < 0) {
-        printf("Sending message (type %ld) to server failed: %d %s\n",
-                req.mtype,
-                errno,
-                strerror(errno));
+    msg.mtype = INIT_MSG;
+    msg.client_id = -1;
+    msg.client_pid = getpid();
+    sprintf(msg.mtext, "%i", msgqueue);
+    if (msgsnd(server, &msg, MAX_MSG, 0) < 0) err("Client send init");
+
+    if (msgrcv(msgqueue, &msg, MAX_MSG, 0, 0) < 0) err("Client receive init");
+    switch(msg.mtype)
+    {
+        case RPLY_MSG:
+            client_id = atoi(msg.mtext);
+            if (client_id < 0) err("Client register");
+            break;
+        case ERR_MSG:
+            err(msg.mtext);
+            break;
+        default:
+            break;
     }
-
-
 }
 
-message* receive(void) {
-    message* received = malloc(MSG_SIZE);
-    memset(received, 0, MSG_SIZE);
-    msgrcv(client_queue_id, received, MSG_SIZE, 0, 0);
-    return received;
+void receive_reply(struct msgbuf* msg)
+{
+    if (msg->mtype == END_MSG) return;
+    if (msgrcv(msgqueue, msg, MAX_MSG, 0, MSG_NOERROR) < 0) perror("Client receive");
+    printf("%s\n", msg->mtext);
 }
 
-// REQUEST HANDLERS ------------------------------------
-
-void key_request(void) {
-    send(Key, &client_queue_id, sizeof(int));
-
-    message* response = receive();
-    client_id = *(int *) response->data;
-    printf("Received client id: %i \n", client_id);
-    free(response);
+void __exit(void)
+{
+    msgctl(msgqueue, IPC_RMID, NULL);
+    if (client_id == -1) return;
+    struct msgbuf msg;
+    msg.mtype = STOP_MSG;
+    msg.client_id = client_id;
+    msg.client_pid = getpid();
+    sprintf(msg.mtext, "%i", client_id);
+    msgsnd(server, &msg, MAX_MSG, 0);
 }
 
-void mirror_request(char* data) {
-    int size = (int) strlen(data);
-    send(Mirror, data, sizeof(char) * size);
-
-    message* response = receive();
-    printf("Received mirror: %s \n", response->data);
-    free(response);
+void err(const char* msg)
+{
+    if (errno) perror(msg);
+    else printf("%s\n", msg);
+    exit(EXIT_FAILURE);
 }
 
-void calculate_request(char* data) {
-    int size = (int) strlen(data);
-    send(Calc, data, sizeof(char) * size);
-
-    message* response = receive();
-    printf("Received calc: %i \n", *(int*)response->data);
-    free(response);
+void sig_handler(int sig)
+{
+    if (sig == SIGINT)
+    {
+        printf("\nShutting down\n");
+        exit(EXIT_SUCCESS);
+    }
+    else if (sig == SIGSEGV) err("Segmentation fault");
 }
 
-void time_request(void) {
-    send(Time, "", sizeof(char));
-
-    message* response = receive();
-    printf("Received time: %s \n", response->data);
-    free(response);
-}
-
-void end_request(void) {
-    send(End, "", sizeof(char));
-    exit(EXIT_SUCCESS);
+void set_sigint()
+{
+    struct sigaction act;
+    act.sa_handler = sig_handler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, NULL) < -1) err("Signal");
+    if (sigaction(SIGSEGV, &act, NULL) < -1) err("Signal");
 }

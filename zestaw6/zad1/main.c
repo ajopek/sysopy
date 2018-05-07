@@ -1,173 +1,199 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
 #include <stdlib.h>
-#include <string.h>
-#include <time.h>
+#include <stdio.h>
 #include <errno.h>
-#include <assert.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
 #include "communication_protocol.h"
 
-#define MAX_CLIENTS_NUM 50
+int msgqueue;
+void print_error_exit(const char* msg);
+void snd_err(const char* msgtext, int msgqid);
+void sig_handler(int sig);
+void set_sigint();
+void register_client(int *clients, struct msgbuf* msg);
+void remove_client(int *clients, struct msgbuf* msg);
+void mirror_request(int client_queue_id, char* msg_text);
+void calc_request(int clqid, char* msg, int len);
+void time_request(int client_queue_id);
+void __exit(void){msgctl(msgqueue, IPC_RMID, NULL);}
 
-// Requests handlers
-void handle_mirror(message *msg);
+int main(int argc, char const *argv[])
+{
+    const char *rqsts[4] = {"MIRROR", "CALC", "TIME", "END"};
+    int i, break_flag = 0;
+    struct msgbuf msg;
+    int clients[MAX_CLIENTS];
+    for (i = 0; i < MAX_CLIENTS; i++) clients[i] = -1;
 
-void handle_time(message *msg);
+    set_sigint();
+    atexit(__exit);
 
-void handle_key(message *msg);
+    if ((msgqueue = msgget(ftok(getenv("HOME"), 0), IPC_CREAT | S_IRWXU | S_IRWXG | S_IRWXO)) < 0) err("Server queue open");
 
-void handle_calculate(message *msg);
-
-void handle_bad_request(message *msg);
-
-void handle_end(message *msg);
-
-// Queues handling
-void remove_queue(void);
-
-// Message handling
-void send(int client_id, void* data, size_t data_size);
-
-int clients[MAX_CLIENTS_NUM];
-int last_client_id = 0;
-int requests_queue_id;
-
-int main() {
-    atexit(remove_queue);
-    // Create requests queue
-    requests_queue_id = msgget(ftok(getenv("HOME"), PROJECT_ID), IPC_CREAT | 0644);
-
-    message *received_message = malloc(MSG_SIZE);
-
-    int end_flag = 0;
-    ssize_t bytes_read;
-    while ((bytes_read = msgrcv(requests_queue_id, received_message, MSG_SIZE, 0,end_flag ? IPC_NOWAIT : 0)) >= 0) {
-        assert(bytes_read <= MSG_SIZE);
-        assert(bytes_read > 0);
-        printf("Received type: %i, data: %s \n", received_message->mtype, received_message->data);
-        switch (received_message->mtype) {
-            case Mirror:
-                //send back reversed string
-                handle_mirror(received_message);
+    for (;;)
+    {
+        if (msgrcv(msgqueue, &msg, MAX_MSG, 0, MSG_NOERROR) < 0) err("Server receive");
+        if (msg.mtype < 5) printf("Received "ANSI_BLUE"%s"ANSI_RESET" from "ANSI_GREEN \
+            "#%i"ANSI_RESET"\n", rqsts[msg.mtype-1], msg.client_id);
+        switch (msg.mtype)
+        {
+            case INIT_MSG:
+                register_client(clients, &msg);
                 break;
-            case Calc:
-                //send back answer
-                handle_calculate(received_message);
+            case STOP_MSG:
+                remove_client(clients, &msg);
                 break;
-            case Time:
-                //send back system time
-                handle_time(received_message);
+            case MIRROR_MSG:
+                mirror_request(clients[msg.client_id], msg.mtext);
                 break;
-            case End:
-                // after empty queue end
-                end_flag = 1;
-                handle_end(received_message);
+            case CALC_MSG:
+                calc_request(clients[msg.client_id], msg.mtext, strlen(msg.mtext));
                 break;
-            case Key:
-                handle_key(received_message);
+            case TIME_MSG:
+                time_request(clients[msg.client_id]);
                 break;
+            case END_MSG:
+                break_flag = 1;
+                break;
+
             default:
-                handle_bad_request(received_message);
-                // No such type, send error
+                printf("Unrecognized request: %s\n", msg.mtext);
                 break;
         }
+        if (break_flag) break;
     }
-    if(bytes_read < 0) {
-        printf("Error: %s \n", strerror(errno));
-    }
-    free(received_message);
+
+    printf("Exiting\n");
     exit(EXIT_SUCCESS);
 }
 
-    void handle_mirror(message *msg) {
-        int size = (int) strlen(msg->data);
-        printf("Handling mirror: %s \n", msg->data);
-        char* reversed = malloc(size * sizeof(char));
-	int i;
-        for(i = 0; i < size; ++i) {
-            reversed[i] = msg->data[size - i - 1];
+void register_client(int *clients, struct msgbuf* msg)
+{
+    int i, tmp;
+    tmp = atoi(msg->mtext);
+    for (i = 0; i < MAX_CLIENTS && clients[i] != -1; i++) {;}
+    if (i < MAX_CLIENTS)
+    {
+        clients[i] = tmp;
+        msg->mtype = RPLY_MSG;
+        sprintf(msg->mtext, "%i", i);
+        if (msgsnd(clients[i], msg, MAX_MSG, 0) < 0)
+        {
+            perror("Connection init msg");
+            clients[i] = -1;
+            return;
         }
-        send(msg->client_id, reversed, size * sizeof(char));
+        printf("Client %i registred: %i \n", i, msg->client_pid);
     }
-
-    void handle_calculate(message *msg) {
-        if (strlen(msg->data) < 3) return handle_bad_request(msg);
-        char *arg_end;
-        int i = 0;
-        while (msg->data[i] != '+' && msg->data[i] != '-' && msg->data[i] != '/' && msg->data[i] != '*') i++;
-        arg_end = msg->data + i - 1;
-        long first_arg = strtol(msg->data, &arg_end, 10);
-        arg_end += 1;
-        long second_arg = strtol(arg_end, NULL, 10);
-        long *result = malloc(sizeof(long));
-        switch (msg->data[i]) {
-            case '+':
-                *result = first_arg + second_arg;
-                break;
-            case '-':
-                *result = first_arg - second_arg;
-                break;
-            case '*':
-                *result = first_arg * second_arg;
-                break;
-            case '/':
-                *result = first_arg / second_arg;
-                break;
-            default:
-                handle_bad_request(msg);
-                return;
-        }
-        send(msg->client_id, result, sizeof(long));
+    else
+    {
+        msg->mtype = ERR_MSG;
+        sprintf(msg->mtext, "Queue full");
+        if (msgsnd(tmp, msg, MAX_MSG, 0)) perror("Error init msg");
     }
+}
 
-    void handle_time(message *msg) {
-        char *result = malloc(sizeof(char) * MAX_DATA_LEN);
-        time_t t = time(NULL);
-        struct tm tm = *localtime(&t);
-        strftime(result, MAX_DATA_LEN, "%c", &tm);
-        send(msg->client_id, result, strlen(result) * sizeof(char));
+void remove_client(int *clients, struct msgbuf* msg)
+{
+    if (msg->client_id < 0 || msg->client_id > MAX_CLIENTS) return;
+    printf("Client %i removed: %i \n", msg->client_id, msg->client_pid);
+    clients[msg->client_id] = -1;
+}
+
+void mirror_request(int client_queue_id, char* msg_text)
+{
+    char *p1 = msg_text;
+    char *p2 = msg_text + strlen(msg_text) - 1;
+
+    while (p1 < p2) {
+        char tmp = *p1;
+        *p1++ = *p2;
+        *p2-- = tmp;
     }
+    struct msgbuf msg;
+    msg.mtype = RPLY_MSG;
+    sprintf(msg.mtext, "%s", msg_text);
+    if (msgsnd(client_queue_id, &msg, MAX_MSG, 0) < 0) perror("Server send");
+}
 
-    void handle_key(message *msg) {
-        // Open queue and add to clients table
-        clients[last_client_id] = *(int *) msg->data;
-        msgget(clients[last_client_id], 0644u);
-        printf("Registered client id: %i, queue: %i \n", last_client_id, clients[last_client_id]);
-        // Send client id
-        int *result = malloc(sizeof(int));
-        *result = last_client_id;
-        last_client_id++;
-        send(*result, result, sizeof(int));
+void calc_request(int clqid, char* msg, int len)
+{
+    char opr, tmp[10];
+    int c = 0, n1, n2, res;
+    while (msg[c] > '0' && msg[c] <= '9' && c < len) c++;
+    if (c == 0) {snd_err("Malformed message", clqid); return;}
+    sprintf(tmp, "%.*s",(c > 10) ? c : 10, msg);
+    n1 = atoi(tmp);
+    while (msg[c] == ' ' && c < len) c++;
+    if (c == len) {snd_err("Malformed message", clqid); return;}
+    opr = msg[c++];
+    while (msg[c] == ' ' && c < len) c++;
+    if (c == len || msg[c] < '0' || msg[c] > '9') {snd_err("Malformed message", clqid); return;}
+    sprintf(tmp, "%.*s", (len-c > 10) ? len-c : 10, msg + c);
+    n2 = atoi(tmp);
+    switch (opr)
+    {
+        case '+': res = n1 + n2; break;
+        case '-': res = n1 - n2; break;
+        case '/': if (n2) res = n1 / n2; else {snd_err("Arithmetic error", clqid); return;} break;
+        case '*': res = n1 * n2; break;
+        default: snd_err("Malformed message", clqid); return;
     }
+    struct msgbuf msgs;
+    msgs.mtype = RPLY_MSG;
+    sprintf(msgs.mtext, "%i", res);
+    if (msgsnd(clqid, &msgs, MAX_MSG, 0) < 0) perror("Server send");
+}
 
-    void handle_end(message *msg) {
-        printf("Server ending. \n");
+void time_request(int client_queue_id)
+{
+    struct msgbuf msg;
+    msg.mtype = RPLY_MSG;
+
+    FILE *date = popen("date", "r");
+    if (date == NULL || date < 0) perror("date");
+    fgets(msg.mtext, MAX_MSG_TXT, date);
+    pclose(date);
+    sprintf(msg.mtext, "%.*s", (int)strlen(msg.mtext)-1, msg.mtext);
+    if (msgsnd(client_queue_id, &msg, MAX_MSG, 0) < 0) perror("Server send");
+}
+
+void err(const char* msg)
+{
+    if (errno) perror(msg);
+    else printf("%s\n", msg);
+    exit(EXIT_FAILURE);
+}
+
+void snd_err(const char* msgtext, int msgqid)
+{
+    struct msgbuf msg;
+    msg.mtype = ERR_MSG;
+    sprintf(msg.mtext,"%s", msgtext);
+    msgsnd(msgqid, &msg, MAX_MSG, 0);
+}
+
+void sig_handler(int sig)
+{
+    if (sig == SIGINT)
+    {
+        printf("\nShutting down\n");
+        exit(EXIT_SUCCESS);
     }
+    else if (sig == SIGSEGV) err("Segmentation fault");
+}
 
-    void handle_bad_request(message *msg) {
-        printf("Bad request. \n");
-    }
-
-    void remove_queue(void) {
-        printf("Removing server queue. \n");
-        msgctl(requests_queue_id, IPC_RMID, NULL);
-    }
-
-void send(int client_id, void* data, size_t data_size) {
-    message res = {
-            .mtype = Response,
-            .client_id = client_id,
-            .data = {0}
-    };
-    memcpy(res.data, data, data_size );
-    if(msgsnd(clients[client_id], &res, MSG_SIZE, 0) < 0) {
-        printf("Sending response to client id: %i failed: %d %s\n",
-               client_id,
-               errno,
-               strerror(errno));
-    }
-
-
+void set_sigint()
+{
+    struct sigaction act;
+    act.sa_handler = sig_handler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, NULL) < -1) err("Signal");
+    if (sigaction(SIGSEGV, &act, NULL) < -1) err("Signal");
 }
