@@ -1,198 +1,188 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <errno.h>
-#include <assert.h>
 #include <mqueue.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <signal.h>
+#include <string.h>
 #include "communication_protocol.h"
 
-#define MAX_CLIENTS_NUM 50
-
-// Requests handlers
-void handle_mirror(message *msg);
-
-void handle_time(message *msg);
-
-void handle_key(message *msg);
-
-void handle_calculate(message *msg);
-
-void handle_bad_request(message *msg);
-
-void handle_end(message *msg);
-
-// Queues handling
-void remove_queue(void);
-
-void remove_client(int client_id);
-
-// Message handling
-void send(int client_id, void* data, size_t data_size);
-
-//Signals
+mqd_t msgqueue;
+mqd_t clients[MAX_CLIENTS];
+void print_error_exit(const char* msg);
+void snd_err(const char* msgtext, mqd_t msgqid);
+void sig_handler(int sig);
 void set_sigint();
-mqd_t clients[MAX_CLIENTS_NUM];
-int last_client_id = 0;
-mqd_t requests_queue_id;
+void register_client(char* msg);
+void remove_client(char* msg);
+void mirror_request(mqd_t queue_id, char* msg_text);
+void calc_request(mqd_t clqid, char* msg, int len);
+void time_request(mqd_t queue_id);
+void __exit(void);
 
-int main() {
-    atexit(remove_queue);
+int main(int argc, char const *argv[])
+{
+    const char *rqsts[4] = {"MIRROR", "CALC", "TIME", "END"};
+    int i, break_flag = 0;
+    char type, msg[MAX_MSG];
+    for (i = 0; i < MAX_CLIENTS; i++) clients[i] = (mqd_t)-1;
+
     set_sigint();
-    // Create requests queue
-    if ((requests_queue_id = mq_open(SERVER_NAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, NULL)) < 0) {
-        printf("Server queue open error %s", strerror(errno));
-	exit(1);
-    }	
+    atexit(__exit);
 
-    message *received_message = malloc(MSG_SIZE);
+    if ((msgqueue = mq_open(SERVER_NAME, O_CREAT | O_EXCL | O_RDONLY, S_IRUSR | S_IWUSR, NULL)) < 0) printf("Server queue open error");
 
-    int end_flag = 0;
-    ssize_t bytes_read;
-    while (1) {
-        if (mq_receive(requests_queue_id, (char*)received_message, 8192, NULL) < 0) {
-            printf("Error: %s \n", strerror(errno));
-	    break;
-        }
-        switch (received_message->mtype) {
-            case Mirror:
-                //send back reversed string
-                handle_mirror(received_message);
+    while (1)
+    {
+        if (mq_receive(msgqueue, msg, MAX_MSG, NULL) < 0) print_error_exit("Server receive error");
+        type = msg[0];
+        if (type < 5) printf("Received %s from %i \n", rqsts[type-1], (int)msg[1]);
+        switch (type)
+        {
+            case INIT_MSG:
+                register_client(msg);
                 break;
-            case Calc:
-                //send back answer
-                handle_calculate(received_message);
+            case STOP_MSG:
+                remove_client(msg);
                 break;
-            case Time:
-                //send back system time
-                handle_time(received_message);
+            case MIRROR_MSG:
+                mirror_request((int)clients[(int)msg[1]], msg + 2);
                 break;
-            case End:
-                // after empty queue end
-                end_flag = 1;
-                handle_end(received_message);
+            case CALC_MSG:
+                calc_request((int)clients[(int)msg[1]], msg + 2, strlen(msg + 2));
                 break;
-            case Key:
-                handle_key(received_message);
+            case TIME_MSG:
+                time_request((int)clients[(int)msg[1]]);
                 break;
-            case Stop:
-                remove_client(received_message->client_id);
+            case END_MSG:
+                break_flag = 1;
                 break;
+
             default:
-                handle_bad_request(received_message);
-                // No such type, send error
+                printf("Unrecognized request: %s\n", msg + 2);
                 break;
         }
-	if(end_flag) break;
+        if (break_flag) break;
     }
-    free(received_message);
+
+    printf("Exiting\n");
     exit(EXIT_SUCCESS);
 }
 
-    void handle_mirror(message *msg) {
-        int size = (int) strlen(msg->data);
-        printf("Handling mirror: %s \n", msg->data);
-        char* reversed = malloc(size * sizeof(char));
-	int i;
-        for(i = 0; i < size; ++i) {
-            reversed[i] = msg->data[size - i - 1];
+void register_client(char* msg)
+{
+    int i;
+    char tmp_name[MAX_MSG-2];
+    mqd_t tmp;
+    sprintf(tmp_name, "%s", msg+2);
+    if ((tmp = mq_open(tmp_name, O_WRONLY)) < 0) print_error_exit("Server opening client queue error");
+    for (i = 0; i < MAX_CLIENTS && clients[i] != -1; i++) {;}
+    if (i < MAX_CLIENTS)
+    {
+        clients[i] = tmp;
+        msg[0] = RPLY_MSG;
+        sprintf(msg+2, "%i", i);
+        if (mq_send(clients[i], msg, MAX_MSG, 1) < 0)
+        {
+            perror("Connection init msg");
+            clients[i] = (mqd_t) -1;
+            return;
         }
-        send(msg->client_id, reversed, size * sizeof(char));
+        printf("Client %i registred\n", i);
     }
-
-    void handle_calculate(message *msg) {
-        if (strlen(msg->data) < 3) return handle_bad_request(msg);
-        char *arg_end;
-        printf("Handling calc %s \n", msg->data);
-        int i = 0;
-        while (msg->data[i] != '+' && msg->data[i] != '-' && msg->data[i] != '/' && msg->data[i] != '*') i++;
-        arg_end = msg->data + i - 1;
-        long first_arg = strtol(msg->data, &arg_end, 10);
-        arg_end += 1;
-        long second_arg = strtol(arg_end, NULL, 10);
-        long *result = malloc(sizeof(long));
-        switch (msg->data[i]) {
-            case '+':
-                *result = first_arg + second_arg;
-                break;
-            case '-':
-                *result = first_arg - second_arg;
-                break;
-            case '*':
-                *result = first_arg * second_arg;
-                break;
-            case '/':
-                *result = first_arg / second_arg;
-                break;
-            default:
-                handle_bad_request(msg);
-                return;
-        }
-        send(msg->client_id, result, sizeof(long));
+    else
+    {
+        msg[0] = ERR_MSG;
+        sprintf(msg+2, "Queue full");
+        if (mq_send(tmp, msg, MAX_MSG, 1)) perror("Error init msg");
     }
+}
 
-    void handle_time(message *msg) {
-        char *result = malloc(sizeof(char) * MAX_DATA_LEN);
-        time_t t = time(NULL);
-        struct tm tm = *localtime(&t);
-        strftime(result, MAX_DATA_LEN, "%c", &tm);
-        send(msg->client_id, result, strlen(result) * sizeof(char));
+void remove_client(char* msg)
+{
+    if (msg[1] < 0 || msg[1] > MAX_CLIENTS) return;
+    int client_id = (int)msg[1];
+    if (mq_close(clients[client_id]) < 0) perror("Remove client");
+    printf("Client %i removed\n", client_id);
+    clients[(int)msg[1]] = -1;
+}
+
+void mirror_request(mqd_t queue_id, char* msg_text)
+{
+    char *p1 = msg_text;
+    char *p2 = msg_text + strlen(msg_text) - 1;
+
+    while (p1 < p2) {
+        char tmp = *p1;
+        *p1++ = *p2;
+        *p2-- = tmp;
     }
+    char msg[MAX_MSG];
+    msg[0] = RPLY_MSG;
+    sprintf(msg+2, "%s", msg_text);
+    if (mq_send(queue_id, msg, MAX_MSG, 1) < 0) perror("Server send");
+}
 
-    void handle_key(message *msg) {
-        // Open queue and add to clients table
-        char name[MAX_DATA_LEN];
-        sprintf(name, "%s", msg->data);
-        printf("Queue name %s \n", msg->data);
-        if ((clients[last_client_id] = mq_open(name, O_WRONLY)) < 0)
-            printf("Client queue open error: %s", strerror(errno));
-        printf("Registered client id: %i, queue: %i \n", last_client_id, clients[last_client_id]);
-        // Send client id
-        int *result = malloc(sizeof(int));
-        *result = last_client_id;
-        last_client_id++;
-        send(*result, result, sizeof(int));
+void calc_request(mqd_t clqid, char* msg, int len)
+{
+    char opr, tmp[10];
+    int c = 0, n1, n2, res;
+    while (msg[c] > '0' && msg[c] <= '9' && c < len) c++;
+    if (c == 0) {snd_err("Malformed message", clqid); return;}
+    sprintf(tmp, "%.*s",(c > 10) ? c : 10, msg);
+    n1 = atoi(tmp);
+    while (msg[c] == ' ' && c < len) c++;
+    if (c == len) {snd_err("Malformed message", clqid); return;}
+    opr = msg[c++];
+    while (msg[c] == ' ' && c < len) c++;
+    if (c == len || msg[c] < '0' || msg[c] > '9') {snd_err("Malformed message", clqid); return;}
+    sprintf(tmp, "%.*s", (len-c > 10) ? len-c : 10, msg + c);
+    n2 = atoi(tmp);
+    switch (opr)
+    {
+        case '+': res = n1 + n2; break;
+        case '-': res = n1 - n2; break;
+        case '/': if (n2) res = n1 / n2; else {snd_err("Arithmetic error", clqid); return;} break;
+        case '*': res = n1 * n2; break;
+        default: snd_err("Malformed message", clqid); return;
     }
+    char msgs[MAX_MSG];
+    msgs[0] = RPLY_MSG;
+    sprintf(msgs+2, "%i", res);
+    if (mq_send(clqid, msgs, MAX_MSG, 1) < 0) perror("Server send");
+}
 
-    void handle_end(message *msg) {
-        printf("Server ending. \n");
-    }
+void time_request(int client_queue_id)
+{
+    char msg[MAX_MSG];
+    msg[0] = RPLY_MSG;
 
-    void handle_bad_request(message *msg) {
-        printf("Bad request. \n");
-    }
+    FILE *date = popen("date", "r");
+    if (date == NULL || date < 0) perror("date");
+    fgets(msg+2, MAX_MSG-2, date);
+    pclose(date);
 
-    void remove_queue(void) {
-        printf("Removing server queue. \n");
-        mq_unlink(SERVER_NAME);
-    }
+    sprintf(msg+2, "%.*s", (int)strlen(msg+2)-1, msg+2);
+    if (mq_send(client_queue_id, msg, MAX_MSG, 1) < 0) perror("Server send");
+}
 
-    void remove_client(int client_id) {
-        if (mq_close(clients[client_id]) < 0)
-            printf("Remove client error: %s", strerror(errno));
-        clients[client_id] = -1;
-    }
+void print_error_exit(const char *msg)
+{
+    if (errno) perror(msg);
+    else printf("%s\n", msg);
+    exit(EXIT_FAILURE);
+}
 
-void send(int client_id, void* data, size_t data_size) {
-    message res = {
-            .mtype = Response,
-            .client_id = client_id,
-            .data = {0}
-    };
-    memcpy(res.data, data, data_size );
-    printf("Sending: %i \n", *(int*)data);
-    if(mq_send(clients[client_id], (char*) &res, 8192, 1) < 0) {
-        printf("Sending response to client id: %i failed: %d %s\n",
-               client_id,
-               errno,
-               strerror(errno));
-    }
-
-
+void snd_err(const char* msgtext, mqd_t msgqid)
+{
+    char msg[MAX_MSG];
+    msg[0] = ERR_MSG;
+    sprintf(msg+2, "%s", msgtext);
+    if(mq_send(msgqid, msg, MAX_MSG, 1) < 0) perror("Error send");
 }
 
 void sig_handler(int sig)
@@ -202,14 +192,22 @@ void sig_handler(int sig)
         printf("\nShutting down\n");
         exit(EXIT_SUCCESS);
     }
-    else if (sig == SIGSEGV) printf("Segmentation fault");
 }
 
-void set_sigint() {
+void set_sigint()
+{
     struct sigaction act;
     act.sa_handler = sig_handler;
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
-    if (sigaction(SIGINT, &act, NULL) < -1) printf("Signal error");
-    if (sigaction(SIGSEGV, &act, NULL) < -1) printf("Signal error");
+    if (sigaction(SIGINT, &act, NULL) < -1) print_error_exit("Sigint set error");
+}
+
+void __exit(void)
+{
+    int i;
+    for (i = 0; i < MAX_CLIENTS; i++)
+        if (clients[i] != -1) if (mq_close(clients[i]) < 0) perror("Client remove");
+    mq_close(msgqueue);
+    mq_unlink(SERVER_NAME);
 }

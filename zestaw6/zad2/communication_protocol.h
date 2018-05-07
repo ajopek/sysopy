@@ -6,28 +6,19 @@
 #define ZESTAW6_COMMUNICATION_PROTOCOL_H
 
 
-#include <fcntl.h>
-#include <mqueue.h>
+#define MIRROR_MSG  (char)1
+#define CALC_MSG    (char)2
+#define TIME_MSG    (char)3
+#define END_MSG     (char)4
+#define INIT_MSG    (char)5
+#define STOP_MSG    (char)6
+#define RPLY_MSG    (char)7
+#define ERR_MSG     (char)8
+#define UNDEF_MSG   (char)9
 
-#define MAX_DATA_LEN 50
-#define PROJECT_ID 's'
-#define MSG_SIZE sizeof(message)
-#define SERVER_NAME "/server_name"
+#define SERVER_NAME "/server_so"
 
-typedef enum reqeuest_type {
-    Mirror = 1,
-    Calc = 2,
-    Time = 3,
-    End = 4,
-    Key = 5,
-    Response = 6,
-    Stop = 7
-} request_type;
-
-typedef struct message {
-    long mtype;
-    int client_id;
-    char data[MAX_DATA_LEN];
-} message;
+#define MAX_MSG     8192
+#define MAX_CLIENTS 50
 
 #endif //ZESTAW6_COMMUNICATION_PROTOCOL_H
