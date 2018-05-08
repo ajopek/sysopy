@@ -1,4 +1,4 @@
-#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
 
 #IncludeRegexScan: ^.*$
 
@@ -6,31 +6,31 @@
 
 #IncludeRegexTransform: 
 
-/home/student/sysopy/zestaw6/zad2/client.c
-stdio.h
--
-sys/types.h
--
-sys/ipc.h
--
-sys/msg.h
--
+/home/artur/sysopy/zestaw6/zad2/client.c
 stdlib.h
 -
-string.h
+stdio.h
 -
-time.h
+mqueue.h
 -
 errno.h
 -
-mqueue.h
+sys/msg.h
 -
-communication_protocol.h
-/home/student/sysopy/zestaw6/zad2/communication_protocol.h
-
-/home/student/sysopy/zestaw6/zad2/communication_protocol.h
+sys/ipc.h
+-
+sys/types.h
+-
+unistd.h
+-
 fcntl.h
 -
-mqueue.h
+signal.h
 -
+string.h
+-
+communication_protocol.h
+/home/artur/sysopy/zestaw6/zad2/communication_protocol.h
+
+/home/artur/sysopy/zestaw6/zad2/communication_protocol.h
 

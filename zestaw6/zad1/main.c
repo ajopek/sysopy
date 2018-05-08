@@ -33,13 +33,12 @@ int main(int argc, char const *argv[])
     set_sigint();
     atexit(__exit);
 
-    if ((msgqueue = msgget(ftok(getenv("HOME"), 0), IPC_CREAT | S_IRWXU | S_IRWXG | S_IRWXO)) < 0) err("Server queue open");
+    if ((msgqueue = msgget(ftok(getenv("HOME"), 0), IPC_CREAT | S_IRWXU | S_IRWXG | S_IRWXO)) < 0) print_error_exit("Server queue open");
 
     for (;;)
     {
-        if (msgrcv(msgqueue, &msg, MAX_MSG, 0, MSG_NOERROR) < 0) err("Server receive");
-        if (msg.mtype < 5) printf("Received "ANSI_BLUE"%s"ANSI_RESET" from "ANSI_GREEN \
-            "#%i"ANSI_RESET"\n", rqsts[msg.mtype-1], msg.client_id);
+        if (msgrcv(msgqueue, &msg, MAX_MSG, 0, MSG_NOERROR) < 0) print_error_exit("Server receive");
+        if (msg.mtype < 5) printf("Received %s  from %i \n", rqsts[msg.mtype-1], msg.client_id);
         switch (msg.mtype)
         {
             case INIT_MSG:
@@ -163,7 +162,7 @@ void time_request(int client_queue_id)
     if (msgsnd(client_queue_id, &msg, MAX_MSG, 0) < 0) perror("Server send");
 }
 
-void err(const char* msg)
+void print_error_exit(const char* msg)
 {
     if (errno) perror(msg);
     else printf("%s\n", msg);
@@ -185,7 +184,7 @@ void sig_handler(int sig)
         printf("\nShutting down\n");
         exit(EXIT_SUCCESS);
     }
-    else if (sig == SIGSEGV) err("Segmentation fault");
+    else if (sig == SIGSEGV) print_error_exit("Segmentation fault");
 }
 
 void set_sigint()
@@ -194,6 +193,6 @@ void set_sigint()
     act.sa_handler = sig_handler;
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
-    if (sigaction(SIGINT, &act, NULL) < -1) err("Signal");
-    if (sigaction(SIGSEGV, &act, NULL) < -1) err("Signal");
+    if (sigaction(SIGINT, &act, NULL) < -1) print_error_exit("Signal");
+    if (sigaction(SIGSEGV, &act, NULL) < -1) print_error_exit("Signal");
 }

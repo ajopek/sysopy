@@ -1,2 +1,4 @@
-/home/student/sysopy/zestaw6/zad2/build/CMakeFiles/client.dir
-/home/student/sysopy/zestaw6/zad2/build/CMakeFiles/server.dir
+/home/artur/sysopy/zestaw6/zad2/build/CMakeFiles/rebuild_cache.dir
+/home/artur/sysopy/zestaw6/zad2/build/CMakeFiles/edit_cache.dir
+/home/artur/sysopy/zestaw6/zad2/build/CMakeFiles/client.dir
+/home/artur/sysopy/zestaw6/zad2/build/CMakeFiles/server.dir

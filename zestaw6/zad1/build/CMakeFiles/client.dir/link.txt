@@ -1,1 +1,1 @@
-/bin/cc      CMakeFiles/client.dir/client.c.o  -o client -rdynamic 
+/usr/bin/cc   -rdynamic CMakeFiles/client.dir/client.c.o  -o client 
