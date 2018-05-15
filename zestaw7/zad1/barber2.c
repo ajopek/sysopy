@@ -12,7 +12,6 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <zconf.h>
 
 #include "common.h"
 

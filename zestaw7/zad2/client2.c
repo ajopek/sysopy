@@ -78,7 +78,6 @@ void run_client(int S) {
         if (barbershop->barber_status == SLEEPING) {
             printf(BLUE_COLOR "# %lo #" RESET_COLOR "%i: woke up the barber\n", get_timestamp(), pid);
             barbershop->barber_status = AWOKEN;
-            printf(BLUE_COLOR "# %lo #" RESET_COLOR "%i: entering the queue\n", get_timestamp(), pid);
             claim_chair();
             barbershop->barber_status = BUSY;
         } else if (!is_queue_full()) {

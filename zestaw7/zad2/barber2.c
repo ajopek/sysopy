@@ -13,9 +13,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
-#include <zconf.h>
 #include <semaphore.h>
-#include <zconf.h>
 
 #include "common.h"
 
