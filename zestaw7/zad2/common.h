@@ -66,28 +66,27 @@ void release_semaphore(sem_t* semaphore) {
 }
 
 // QUEUE HANDLERS --------------------------------------------------------------------
-
 int is_queue_full() {
-    return barbershop->client_count < barbershop->waiting_room_size ? 0 : 1;
+    if (barbershop->client_count < barbershop->waiting_room_size) return 0;
+    return 1;
 }
 
 int is_queue_empty() {
-    return barbershop->client_count == 0 ? 1 : 0;
+    if (barbershop->client_count == 0) return 1;
+    return 0;
 }
 
 void enter_queue(pid_t pid) {
-    barbershop->queue[barbershop->client_count++] = pid;
+    barbershop->queue[barbershop->client_count] = pid;
+    barbershop->client_count += 1;
 }
 
 void pop_queue() {
-    int i = 0;
-    // Shift queue content left
-    while(i < barbershop->client_count - 1) {
+    for (int i = 0; i < barbershop->client_count - 1; ++i) {
         barbershop->queue[i] = barbershop->queue[i + 1];
-        i++;
     }
-    // After shift last pid is copied, change to 0
+
     barbershop->queue[barbershop->client_count - 1] = 0;
-    barbershop->client_count--;
+    barbershop->client_count -= 1;
 }
 #endif
