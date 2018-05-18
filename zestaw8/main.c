@@ -19,6 +19,11 @@ double **filter;
 int w, h, c;
 int thread_num = 1;
 
+typedef struct interval{
+    int begin;
+    int end;
+} interval_t;
+
 typedef struct timestamp{
     long real;
     long user;
@@ -41,9 +46,9 @@ int calculate_pixel(int x, int y) {
     return (int) round(value);
 }
 
-void apply_filter(){
+void apply_filter(interval_t *interval){
     int i,j;
-    for (i = 0; i < h; ++i) {
+    for (i = interval->begin; i < interval->end; ++i) {
         for (j = 0; j < w; ++j) {
             picture[i][j] = calculate_pixel(i, j);
         }
@@ -165,8 +170,20 @@ int main(int argc, char* argv[]) {
     atexit(&clean_up);
     load_picture(argv[2]);
     load_filter(argv[3]);
+    int rows_per_thread = h/thread_num;
+    int last_end = 0;
     timestamp timestamp1 = get_timestamp();
-    apply_filter();
+    for (i = 0; i < thread_num; ++i) {
+        if(i == thread_num - 1 && rows_per_thread * thread_num < h) {
+            rows_per_thread += h - (rows_per_thread * thread_num);
+        }
+        interval_t interval = {last_end, last_end+rows_per_thread};
+        last_end += rows_per_thread;
+        pthread_t thread;
+
+        pthread_create(&thread, NULL, &apply_filter, &interval);
+
+    }
     timestamp timestamp2 = get_timestamp();
     char* desc = malloc(sizeof(char) * 100);
     sprintf(desc, "\n thread num: %i\n picture: w: %i, h: %i \n filter: c: %i", thread_num, w, h, c);
