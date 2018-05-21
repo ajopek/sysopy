@@ -43,7 +43,7 @@ int calculate_pixel(int x, int y) {
         for(j = 0; j < c; ++j) {
             int a = max(1, x - (int)ceil(c/2) + i);
             int b = max(1, y - (int)ceil(c/2) + j);
-            if(a < h && b < w) value += picture[a][b] * filter[i][j];
+            if(a < w && b < h) value += picture[a][b] * filter[i][j];
         }
     }
     return (int) round(value);
@@ -52,7 +52,7 @@ int calculate_pixel(int x, int y) {
 void apply_filter(interval_t *interval){
     int i,j;
     for (i = interval->begin; i < interval->end; ++i) {
-        for (j = 0; j < w; ++j) {
+        for (j = 0; j < h; ++j) {
             filtered[i][j] = calculate_pixel(i, j);
         }
     }
@@ -177,21 +177,22 @@ int main(int argc, char* argv[]) {
     atexit(&clean_up);
     load_picture(argv[2]);
     load_filter(argv[3]);
-    int rows_per_thread = h/thread_num;
+    int rows_per_thread = w/thread_num;
     int last_end = 0;
     timestamp timestamp1 = get_timestamp();
 
     pthread_t tid[thread_num];
     pthread_attr_t* attr = calloc(1, sizeof(pthread_attr_t));
-
+    interval_t intervals[thread_num];
     for (i = 0; i < thread_num; ++i) {
         if(i == thread_num - 1 && rows_per_thread * thread_num < h) {
             rows_per_thread += h - (rows_per_thread * thread_num);
         }
-        interval_t interval = {last_end, last_end+rows_per_thread};
+        intervals[i].begin = last_end;
+        intervals[i].end = last_end+rows_per_thread;
         last_end += rows_per_thread;
         pthread_attr_init(attr);
-        pthread_create(tid + i, attr, &apply_filter, &interval);
+        pthread_create(tid + i, attr, &apply_filter, intervals + i);
         pthread_attr_destroy(attr);
     }
 

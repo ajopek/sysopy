@@ -1,0 +1,36 @@
+Time of 
+ thread num: 1
+ picture: w: 512, h: 512 
+ filter: c: 14 
+Real time: 1219485 
+User time: 1219406 
+System time: 0 
+
+
+Time of 
+ thread num: 2
+ picture: w: 512, h: 512 
+ filter: c: 14 
+Real time: 614833 
+User time: 1221835 
+System time: 115 
+
+
+Time of 
+ thread num: 4
+ picture: w: 512, h: 512 
+ filter: c: 14 
+Real time: 633148 
+User time: 1549411 
+System time: 0 
+
+
+Time of 
+ thread num: 8
+ picture: w: 512, h: 512 
+ filter: c: 14 
+Real time: 1072372 
+User time: 3967442 
+System time: 7542 
+
+
