@@ -15,6 +15,7 @@
     exit(EXIT_FAILURE);                                                                  }
 
 int **picture = NULL;
+int **filtered = NULL;
 double **filter;
 int w, h, c;
 int thread_num = 1;
@@ -40,7 +41,9 @@ int calculate_pixel(int x, int y) {
     double value = 0;
     for(i = 0; i < c; ++i) {
         for(j = 0; j < c; ++j) {
-            value += picture[max(1, x - (int)ceil(c/2) + i)][max(1, y - (int)ceil(c/2) + j)] * filter[i][j];
+            int a = max(1, x - (int)ceil(c/2) + i);
+            int b = max(1, y - (int)ceil(c/2) + j);
+            if(a < h && b < w) value += picture[a][b] * filter[i][j];
         }
     }
     return (int) round(value);
@@ -50,7 +53,7 @@ void apply_filter(interval_t *interval){
     int i,j;
     for (i = interval->begin; i < interval->end; ++i) {
         for (j = 0; j < w; ++j) {
-            picture[i][j] = calculate_pixel(i, j);
+            filtered[i][j] = calculate_pixel(i, j);
         }
     }
 };
@@ -79,6 +82,10 @@ void load_picture(char* pathname){
     picture = malloc(sizeof(int*) * w );
     for(i = 0; i < w; ++i) {
         picture[i] = malloc(sizeof(int) * h);
+    }
+    filtered = malloc(sizeof(int*) * w );
+    for(i = 0; i < w; ++i) {
+        filtered[i] = malloc(sizeof(int) * h);
     }
     for(i = 0; i < h; i++) {
         for(j = 0; j < w; j++){
@@ -119,10 +126,10 @@ void clean_up(void) {
 void write_picture(char* pathname) {
     int i, j;
     FILE* output = open_file(pathname, "w");
-    fprintf(output, "P2\n%i %i\n", w, h);
+    fprintf(output, "P2\n%i %i\n 256 \n", w, h);
     for(i = 0; i < h; ++i) {
         for (j = 0; j < w; ++j) {
-            fprintf(output, "%i ", picture[i][j]);
+            fprintf(output, "%i ", filtered[i][j]);
         }
         fprintf(output, "\n");
     }
@@ -173,22 +180,32 @@ int main(int argc, char* argv[]) {
     int rows_per_thread = h/thread_num;
     int last_end = 0;
     timestamp timestamp1 = get_timestamp();
+
+    pthread_t tid[thread_num];
+    pthread_attr_t* attr = calloc(1, sizeof(pthread_attr_t));
+
     for (i = 0; i < thread_num; ++i) {
         if(i == thread_num - 1 && rows_per_thread * thread_num < h) {
             rows_per_thread += h - (rows_per_thread * thread_num);
         }
         interval_t interval = {last_end, last_end+rows_per_thread};
         last_end += rows_per_thread;
-        pthread_t thread;
-
-        pthread_create(&thread, NULL, &apply_filter, &interval);
-
+        pthread_attr_init(attr);
+        pthread_create(tid + i, attr, &apply_filter, &interval);
+        pthread_attr_destroy(attr);
     }
+
+    int k;
+    for (k = 0; k < thread_num ; ++k) {
+        pthread_join(tid[k], NULL);
+    }
+
+
     timestamp timestamp2 = get_timestamp();
     char* desc = malloc(sizeof(char) * 100);
     sprintf(desc, "\n thread num: %i\n picture: w: %i, h: %i \n filter: c: %i", thread_num, w, h, c);
     print_time(timestamp1, timestamp2, desc);
-    write_picture(argv[3]);
+    write_picture(argv[4]);
     return 0;
 }
 
