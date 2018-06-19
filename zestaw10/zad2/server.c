@@ -257,10 +257,11 @@ send_message (const conn * addr, msg_type type, void *data, uint32_t len)
 void *
 ping_all(void *arg)
 {
-    (void) arg;			// unused
+    (void) arg;
+    int i;
     while (true)
     {
-        for (int i = 0; i < MAX_CLIENTS; ++i)
+        for (i = 0; i < MAX_CLIENTS; ++i)
         {
             if (clients[i].name[0] == '\0')
                 continue;
@@ -321,7 +322,8 @@ handle_register (const char *name, const conn * sender)
     }
 
     int available_idx = -1;
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (available_idx == -1 && clients[i].name[0] == '\0')
         {
@@ -358,7 +360,8 @@ handle_result (const arith_resp * resp, const char *client_name)
 void
 handle_unregister (const char *name)
 {
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (strcmp (clients[i].name, name) == 0)
         {
@@ -520,7 +523,8 @@ spawn (void *(*func) (void *), void *args)
 client *
 find_client_by_name (const char *name)
 {
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (strcmp (clients[i].name, name) == 0)
         {

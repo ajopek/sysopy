@@ -320,7 +320,8 @@ handle_register (const char *name, int socket)
     }
 
     int available_idx = -1;
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (available_idx == -1 && clients[i].socket <= 0)
         {
@@ -357,7 +358,8 @@ handle_result (const arith_response * resp, const char *client_name)
 void
 handle_unregister (const char *name)
 {
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (strcmp (clients[i].name, name) == 0)
         {
@@ -377,7 +379,8 @@ handle_unregister (const char *name)
 void
 handle_ping (int socket)
 {
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (clients[i].socket == socket)
         {
@@ -396,10 +399,11 @@ handle_ping (int socket)
 void *
 ping_all(void *arg)
 {
-    (void) arg;			// unused
+    (void) arg;
+    int i;
     while (true)
     {
-        for (int i = 0; i < MAX_CLIENTS; ++i)
+        for (i = 0; i < MAX_CLIENTS; ++i)
         {
             if (clients[i].socket <= 0)
                 continue;
@@ -546,7 +550,8 @@ spawn (void *(*func) (void *), void *args)
 client *
 find_client_by_socket (const int socket)
 {
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (clients[i].socket == socket)
         {
@@ -564,7 +569,7 @@ get_client(void)
     {
         return NULL;
     }
-    int i = rand () % MAX_CLIENTS;
+    int i = rand () % client_count;
     while (clients[i].socket <= 0)
     {
         i = (i + 1) % MAX_CLIENTS;
@@ -575,7 +580,8 @@ get_client(void)
 void
 cleanup (void)
 {
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    int i;
+    for (i = 0; i < MAX_CLIENTS; ++i)
     {
         if (clients[i].socket > 0)
         {
